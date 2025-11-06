@@ -11,6 +11,7 @@
 # - pip install typing-extensions (precisa para compatibilidade com algumas versões do python)
 # - pip install setuptools
 # - pip install Pyrebase4
+# - pip install pygame
 #
 #   Orientações de execução:
 # - Execute este arquivo (main.py) (após as dependências serem instaladas, garanta também que a pasta 'assets' com as imagens e sons esteja no mesmo diretório).
