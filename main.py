@@ -1,553 +1,119 @@
-# =============================================================================
-# PROJETO PYGAME - TOWER DEFENSE
-#
-#  Nomes dos componentes do grupo:
-# - Ian Riki Taniguchi
-# - João Alves Gava
-# - João Vitor Del Pupo
-#
-#  Dependências:
-# - pygame (instalar com: pip install pygame[caso tenha pip instalado])
-# - pip install typing-extensions (precisa para compatibilidade com algumas versões do python)
-# - pip install setuptools
-# - pip install Pyrebase4
-# - pip install pygame
-#
-#   Orientações de execução:
-# - Execute este arquivo (main.py) (após as dependências serem instaladas, garanta também que a pasta 'assets' com as imagens e sons esteja no mesmo diretório).
-# - Tela de Menu:
-# - Pressione [ESPAÇO] para iniciar o jogo.
-# - Tela do Jogo:
-# - Use o mouse para clicar nos ícones de torre na UI inferior.
-# - Clique em um dos círculos verdes (slots) no mapa para construir.
-# - Pressione [ESC] para cancelar o modo de construção.
-# - Tela de ou Game Over ou Vitória:
-# - Pressione [ESPAÇO] para reiniciar.
-#
-# =============================================================================
+# ARQUIVO MAIN PRINCIPAL QUE INICIA O HUB DE JOGOS COM AUTENTICAÇÃO FIREBASE E INTERFACE PYGAME
+# RESPONSÁVEL POR GERENCIAR O MENU E INICIAR CADA JOGO INTEGRADO NO HUB
+# Necessário instalar as dependências: pygame, pyrebase4
+# Use:
+# -pip install pygame pyrebase4
 
 import pygame
 import sys
-import math
-import random
-from pathlib import Path
 import pyrebase
+import os  # Importado para centralizar a janela
+
+import tower_defense_game
+import snake_game
+import ping_pong_game
+import tic_tac_toe_game
+import space_invaders_game
+import flappy_bird_game
+import pacman_game
+
+# raycaster_game removido
+
+print(
+    "--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------"
+)
+
+# Adiciona a linha para centralizar a janela ANTES do init
+os.environ["SDL_VIDEO_WINDOW_POS"] = "center"
 
 firebaseConfig = {
     "apiKey": "AIzaSyB6p7OSeA19GyE1lypGTfWe-_Otbt2b0f8",
     "authDomain": "mechanical-tower-defense.firebaseapp.com",
-    "databaseURL": "https://mechanical-tower-defense.firebaseio.com",
+    "databaseURL": "https" + "://mechanical-tower-defense.firebaseio.com",
     "storageBucket": "mechanical-tower-defense.appspot.com",
 }
 try:
     firebase = pyrebase.initialize_app(firebaseConfig)
     auth = firebase.auth()
-    print("Firebase inicializado com sucesso.")
 except Exception as e:
-    print(f"ERRO CRÍTICO: Falha ao inicializar o Firebase: {e}")
-    print("O jogo pode não funcionar online. Verifique as credenciais e a conexão.")
+    print(f"ERRO CRITICO: Falha ao inicializar o Firebase: {e}")
     auth = None
 
-# =============================================================================
-# 1. CONFIGURAÇÕES INICIAIS
-# =============================================================================
-
-# Inicializa o Pygame e o mixer de áudio
 pygame.init()
 pygame.mixer.init()
 
-# Configuração do Pathlib (para garantir que funcione em qualquer pasta)
-try:
-    BASE_DIR = Path(__file__).resolve().parent
-    ASSETS_DIR = BASE_DIR / "assets"
-    IMAGES_DIR = ASSETS_DIR / "images"
-    SOUNDS_DIR = ASSETS_DIR / "sounds"
-except NameError:
-    BASE_DIR = Path(
-        "."
-    ).resolve()  # .resolve() pega o path absoluto da pasta atual (pathlib)
-    ASSETS_DIR = BASE_DIR / "assets"
-    IMAGES_DIR = ASSETS_DIR / "images"
-    SOUNDS_DIR = ASSETS_DIR / "sounds"
+# Lógica de Scaling REMOVIDA
+# Define o tamanho final da tela
+SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# virtual_screen e display_surface REMOVIDOS
 
+pygame.display.set_caption("Hub de Jogos")
+clock = pygame.time.Clock()
 
-# consts da screen
-SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720  # Deixa 100px na parte inferior para UI
-UI_PANEL_HEIGHT = 100
-GAME_HEIGHT = SCREEN_HEIGHT - UI_PANEL_HEIGHT
-FPS = 60
-
-# consts do jogo
-INITIAL_LIVES = 20
-INITIAL_MONEY = 300  # Aumentado para permitir construção inicial
-
-# Cores como const para poder trabalhar dps com melhor simplicidade
-# Caps lock const (convenção)
-LIGHT_BLUE = (173, 216, 230)
+BG_COLOR = (30, 30, 40)
+TEXT_COLOR = (230, 230, 230)
+PRIMARY_COLOR = (0, 150, 136)
+PRIMARY_HOVER = (0, 170, 156)
+SECONDARY_COLOR = (70, 70, 90)
+SECONDARY_HOVER = (90, 90, 110)
+INPUT_BG = (50, 50, 60)
+FOCUS_COLOR = (50, 150, 255)
+ERROR_COLOR = (200, 50, 50)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-RED = (255, 0, 0)
-GREEN = (0, 255, 0)
-BLUE = (0, 0, 255)
-GREY = (100, 100, 100)
-ORANGE = (255, 165, 0)
 
-# Configurações da janela, seta padrao pra ficar formato bom para todos monitores
-screen = pygame.display.set_mode(
-    (SCREEN_WIDTH, SCREEN_HEIGHT)
-)  # seta o tamanho da janela, de acordo com as consts ja setadas
-pygame.display.set_caption("Tower Defense")  # titulo da janela
-clock = pygame.time.Clock()  # seta o clock para controlar fps
-
-# --- Métodos auxiliares para carregar as mídias ---
-
-
-# Fallback de assets. Se alguém esquecer de dar 'commit' em uma imagem,
-# isso aqui cria um quadrado colorido e evita que o jogo CRASHE.
-def create_placeholder_surface(
-    width, height, color
-):  # Cria uma superfície de cor sólida como placeholder
-    surface = pygame.Surface((width, height), pygame.SRCALPHA)
-    surface.fill(color)
-    return surface
-
-
-def load_image(
-    filename, placeholder_size, placeholder_color
-):  # Função que carrega cada imagem, se falha, cria um placeholder
-    try:
-        return pygame.image.load(
-            IMAGES_DIR / filename
-        ).convert_alpha()  # convert alpha para manter transparência caso seja png
-    except (
-        pygame.error,
-        FileNotFoundError,
-    ):  # Captura erro da biblioteca nao achar o arquivo e FileNotFoundError também
-        print(
-            f"AVISO: Imagem '{filename}' não encontrada. Criando placeholder padrão."
-        )  # Aviso no console
-        return create_placeholder_surface(
-            placeholder_size[0], placeholder_size[1], placeholder_color
-        )  # chama a função que cria o placeholder
-
-
-def load_sound(
-    filename,
-):  # Tenta carregar um som, se falhar, retorna um objeto vazio do tipo 'none'
-    try:
-        # CONVERTE O PATH PARA UMA STRING (erro de depreciated)
-        return pygame.mixer.Sound(str(SOUNDS_DIR / filename))
-    except pygame.error:
-        print(f"AVISO: Som '{filename}' não encontrado.")
-        return None
-
-
-# Carregamento em si das midias
 try:
-    # fundo do jogo
-    background_image = pygame.image.load(
-        IMAGES_DIR / "map.png"
-    ).convert()  # convert para lidar com o tamanho da imagem
-except pygame.error as e:
-    print(f"Erro CRÍTICO ao carregar 'map.png': {e}")
-    print("O 'map.png' é essencial. Criando um fundo preto por padrão.")
-    background_image = create_placeholder_surface(SCREEN_WIDTH, GAME_HEIGHT, BLACK)
-
-# Sprites (Carregados dentro das classes, mas são definidos previamente)
-soldier_sprite = load_image(
-    "soldier_sprite.png", (32, 32), BLUE
-)  # load_image retorna um objeto Surface que é carregado para cada classe
-tank_sprite = load_image("tank.png", (40, 40), GREY)  #
-
-arrow_tower_sprite = load_image("arrow_tower.png", (48, 48), GREEN)
-cannon_tower_sprite = load_image("cannon_tower.png", (48, 48), RED)
-arrow_projectile_sprite = load_image("arrow_projectile.png", (10, 10), WHITE)
-cannon_projectile_sprite = load_image("cannon_projectile.png", (15, 15), ORANGE)
-
-# Fontes
-try:  # boa pratica
-    font_large = pygame.font.SysFont("Arial", 48)
-    font_medium = pygame.font.SysFont("Arial", 24)
-    font_small = pygame.font.SysFont("Arial", 18)
-except:  # esse except garante que caso o sistema não tenha a fonte Arial, ele use a fonte padrão já baixada com o pygame
-    font_large = pygame.font.Font(None, 64)
-    font_medium = pygame.font.Font(None, 32)
-    font_small = pygame.font.Font(None, 24)
-
-# Sons # load_sound retorna um objeto do tipo Sound que é carregado para cada classe, a classe Sound é definida na própria biblioteca pygame
-
-sfx_arrow_fire = load_sound("arrow_fire.wav")
-sfx_cannon_fire = load_sound("cannon_fire.wav")
-sfx_enemy_death = load_sound("enemy_death.wav")
-sfx_life_lost = load_sound("life_lost.wav")
-sfx_build = load_sound("build.wav")
-
-background_music = load_sound("background_music.mp3")
-if (
-    background_music
-):  # diminue o volume da musica de fundo quando ela é carregada, if necessario para evitar erro caso o som nao seja carregado(por nao existir ou etc)
-    background_music.set_volume(0.3)
+    font_large = pygame.font.SysFont("Arial", 40)
+    font_medium = pygame.font.SysFont("Arial", 32)
+    font_small = pygame.font.SysFont("Arial", 24)
+except:
+    font_large = pygame.font.Font(None, 54)
+    font_medium = pygame.font.Font(None, 42)
+    font_small = pygame.font.Font(None, 32)
 
 
-# --- Definições do Jogo ---
-
-# Definição do Caminho (Waypoints)
-WAYPOINTS = [  # esses waypoints definem o caminho que os inimigos vão seguir, são coordenadas x,y que podem ser mudadas, mas dependem do mapa para fazer sentido visual
-    (-100, 150),
-    (300, 150),
-    (300, 400),
-    (1000, 400),
-    (1000, 200),
-    (1380, 200),  # Ponto final (fora da tela)
-]
-
-# Locais de construção das torres, necessário alterar conforme o mapa (Del Pupo)
-TOWER_SLOTS = [
-    (200, 250),
-    (400, 250),
-    (200, 350),
-    (500, 500),
-    (700, 500),
-    (900, 500),
-    (900, 300),
-]
-
-TORRE_SLOT_RECTS = [
-    pygame.Rect(pos[0] - 24, pos[1] - 24, 48, 48) for pos in TOWER_SLOTS
-]  # cria os rects para cada slot, que detecta a colisão do mouse os pos sao para centralizar o rect, 24 metade dos 48 pixels, deve ser alterado se mudar o tamanho das torres
-occupied_slots = []  # slots que já tem torre
-
-WAVE_DEFINITIONS = [  # define quantos soldier_sprites e tanks cada onda possui
-    {"soldier": 5, "tank": 0},  # Onda 1
-    {"soldier": 10, "tank": 0},  # Onda 2
-    {"soldier": 15, "tank": 2},  # Onda 3
-    {"soldier": 10, "tank": 5},  # Onda 4
-    {"soldier": 0, "tank": 10},  # Onda 5
-    {"soldier": 20, "tank": 10},  # Onda 6
-]
-
-# Definição das Torres
-TOWER_DATA = {
-    # define os atributos de cada tipo de torre e bota no dicionario TOWER_DATA a chave é o tipo da torre e o valor é o dicionario com os atributos(poderia ser usado objeto mas dicionario é simples eficiente e 100% funcional nesse caso)
-    # Deixamos em um dict global para facilitar o balanceamento e a adição de novas torres
-    # sem precisar mexer nas classes.
-    "arrow": {
-        "image": arrow_tower_sprite,
-        "cost": 50,
-        "range": 150,
-        "fire_rate": 1000,  # ms
-        "damage": 25,
-    },
-    "cannon": {
-        "image": cannon_tower_sprite,
-        "cost": 120,
-        "range": 120,
-        "fire_rate": 2000,  # ms
-        "damage": 50,
-        "splash_radius": 50,  # Raio do dano em área
-    },
-}
-
-# =============================================================================
-# 2. CLASSES DO JOGO
-# =============================================================================
-
-
-class Enemy(pygame.sprite.Sprite):  # classe para os inimigos
-    def __init__(self, enemy_type, path):
-        super().__init__()  # inicializa a classe super sprite do pygame
-
-        self.path = path
-        self.waypoint_index = 0  # comeca no waypoint 0
-        self.pos = pygame.math.Vector2(
-            self.path[self.waypoint_index]
-        )  # .math cria um vetor pra calcular os movimentos
-
-        # Atributos dos inimigos baseados no tipo
-        if enemy_type == "soldier":
-            self.image = soldier_sprite
-            self.speed = 2
-            self.max_health = 100
-            self.reward = 10
-        elif enemy_type == "tank":
-            self.image = tank_sprite
-            self.speed = 1
-            self.max_health = 300
-            self.reward = 25
-
-        self.health = self.max_health  # seta a vida maxima
-        self.rect = self.image.get_rect(
-            center=self.pos
-        )  # seta o rect para colisao e desenho, centralizado tambem
-
-    def update(self):
-
-        # Sobrescreve o update() padrão do pygame.sprite.Sprite
-        # Esta função é chamada automaticamente pelo enemy_group.update() no loop principal.
-        # Lógica de movimento do inimigo em direção ao próximo waypoint
-        target_waypoint = self.path[self.waypoint_index]
-        target_vector = pygame.math.Vector2(target_waypoint)
-
-        try:
-            direction = (target_vector - self.pos).normalize()
-        except ValueError:  # Ocorre se a posição e o alvo forem os mesmos
-            direction = pygame.math.Vector2(0, 0)  # Chegou
-
-        self.pos += direction * self.speed
-        self.rect.center = self.pos
-
-        if (target_vector - self.pos).length_squared() < self.speed**2:
-            self.waypoint_index += 1
-            # 5. Checar se terminou o caminho
-            if self.waypoint_index >= len(
-                self.path
-            ):  # se o inimigo chegou ao final do caminho (fora da tela)
-                pygame.event.post(
-                    pygame.event.Event(pygame.USEREVENT, {"tipo": "enemy_leaked"})
-                )
-                self.kill()  # remove o inimigo
-
-    def take_damage(
-        self, amount
-    ):  # Aplica dano ao inimigo e retorna a recompensa(dinheiro) se morrer.
-        self.health -= amount
-        if self.health <= 0:
-            self.kill()  # Remove o sprite do jogo
-            if (
-                sfx_enemy_death
-            ):  # toca o som de morte se ele existir (mesma verificação anterior)
-                sfx_enemy_death.play()
-            return self.reward  # retorna a recompensa ja definida na criação do inimigo
-        return 0  # Retorna 0 de recompensa (reward) se o inimigo só tomou dano mas não morreu.
-
-    def draw_health_bar(self, surface):  # Desenha a barra de vida acima do inimigo.
-        if self.health < self.max_health:
-            bar_width = self.rect.width * 0.8  # deixa menor q o inimigo
-            bar_height = 5
-            health_ratio = self.health / self.max_health  # define a proporcao
-
-            bg_rect = pygame.Rect(
-                self.rect.centerx - bar_width / 2,
-                self.rect.top - 10,
-                bar_width,
-                bar_height,
-            )  # barra total
-            pygame.draw.rect(surface, RED, bg_rect)  # desenha a barra
-
-            hp_rect = pygame.Rect(
-                self.rect.centerx - bar_width / 2,
-                self.rect.top - 10,
-                bar_width * health_ratio,
-                bar_height,
-            )  # barra de vida atual
-            pygame.draw.rect(surface, GREEN, hp_rect)  # desenha a barra
-
-
-class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
-    def __init__(self, tower_type, pos):
-        super().__init__()
-
-        self.pos = pygame.math.Vector2(pos)
-        self.tower_type = tower_type
-        self.data = TOWER_DATA[tower_type]
-
-        self.image = self.data["image"]
-        self.range = self.data["range"]
-        self.fire_rate = self.data["fire_rate"]
-        self.damage = self.data["damage"]
-
-        self.rect = self.image.get_rect(center=self.pos)
-        self.last_shot_time = pygame.time.get_ticks()
-        self.target = None
-
-    def update(self, enemy_group, projectile_group):  # Encontra um alvo e atira.
-        self.find_target(enemy_group)
-
-        if self.target:
-            now = pygame.time.get_ticks()
-            if now - self.last_shot_time >= self.fire_rate:
-                self.shoot(projectile_group)
-                self.last_shot_time = now
-
-    def find_target(
-        self, enemy_group
-    ):  # Encontra o inimigo mais próximo dentro do alcance usando loop
-        if self.target and (
-            not self.target.alive()
-            or (self.target.pos - self.pos).length() > self.range
-        ):  # verifica se esta vivo e no range
-            self.target = None  # retorna nulo se nao estiver mais valido
-
-        if not self.target:  # se nao tiver alvo procura um novo
-            closest_dist_sq = (
-                self.range**2
-            )  # usa o quadrado do alcance pq com raiz pode dar erro
-            for (
-                enemy
-            ) in (
-                enemy_group
-            ):  # para cada inimigo calcula a distancia em x e em y usando pitagoras
-                dist_sq = (enemy.pos - self.pos).length_squared()
-                if (
-                    dist_sq <= closest_dist_sq
-                ):  # se a distancia estiver dentro do alcance
-                    closest_dist_sq = dist_sq
-                    self.target = enemy  # define o inimigo como alvo
-
-    def shoot(self, projectile_group):  #  Cria um novo projétil  do tipo da torre
-        if self.tower_type == "arrow":
-            projectile = Projectile("arrow", self.pos, self.target, self.damage)
-            projectile_group.add(projectile)
-            if sfx_arrow_fire:
-                sfx_arrow_fire.play()
-
-        elif self.tower_type == "cannon":
-            projectile = Projectile(
-                "cannon", self.pos, self.target, self.damage, self.data["splash_radius"]
-            )
-            projectile_group.add(projectile)
-            if sfx_cannon_fire:
-                sfx_cannon_fire.play()
-
-    def draw_range(
-        self, surface
-    ):  #  Desenha o círculo de alcance da torre pra cada torre
-        range_surface = pygame.Surface(
-            (self.range * 2, self.range * 2), pygame.SRCALPHA
-        )
-        pygame.draw.circle(
-            range_surface, (255, 255, 255, 50), (self.range, self.range), self.range
-        )
-        surface.blit(range_surface, (self.pos.x - self.range, self.pos.y - self.range))
-
-
-class Projectile(pygame.sprite.Sprite):  # Classe dos projéteis disparados pelas torres.
-    def __init__(self, projectile_type, pos, target, damage, splash_radius=0):
-        super().__init__()
-
-        self.projectile_type = projectile_type  # tipo do projetil
-        self.pos = pygame.math.Vector2(pos)  # posicao usando vetor do pygame
-        self.target = target
-        self.damage = damage
-
-        if (
-            self.projectile_type == "arrow"
-        ):  # flecha e canhao tem comportamentos diferentes
-            self.image = arrow_projectile_sprite
-            self.speed = 10
-
-        elif self.projectile_type == "cannon":
-            self.image = cannon_projectile_sprite
-            self.speed = 6
-            self.splash_radius = splash_radius
-            # Canhão mira na POSIÇÃO, não no alvo vector serve pra isso.
-            self.target_pos = pygame.math.Vector2(target.pos)
-
-        self.rect = self.image.get_rect(center=self.pos)
-
-    def update(
-        self, enemy_group, money_callback
-    ):  # da update para mover o projetil e checar colisões.
-        if self.projectile_type == "arrow":
-            self.move_arrow(
-                money_callback
-            )  # chama o metodo de mover flecha e chama o callback de dinheiro
-        elif self.projectile_type == "cannon":
-            self.move_cannon(
-                enemy_group, money_callback
-            )  # chama o método de mover canhão
-
-    def move_arrow(self, money_callback):  #  Lógica da flecha teleguiada
-        if not self.target or not self.target.alive():
-            self.kill()
-            return
-        try:
-            direction = (self.target.pos - self.pos).normalize()
-        except ValueError:
-            direction = pygame.math.Vector2(0, 0)
-
-        self.pos += direction * self.speed
-        self.rect.center = self.pos
-
-        # Checar colisão
-        if pygame.sprite.collide_circle(self, self.target):
-            reward = self.target.take_damage(self.damage)
-            money_callback(reward)  # Adiciona dinheiro
-            self.kill()
-
-    def move_cannon(
-        self, enemy_group, money_callback
-    ):  # Lógica do projétil de canhão (movimento em linha reta dano em área)
-        try:
-            direction = (self.target_pos - self.pos).normalize()
-        except ValueError:
-            direction = pygame.math.Vector2(0, 0)
-
-        self.pos += direction * self.speed
-        self.rect.center = self.pos
-
-        # Checar se chegou ao destino
-        if (self.target_pos - self.pos).length_squared() < self.speed**2:
-            self.explode(enemy_group, money_callback)
-            self.kill()
-
-    def explode(self, enemy_group, money_callback):  # aplica o dano em área
-        for enemy in enemy_group:
-            dist_sq = (enemy.pos - self.pos).length_squared()
-            if dist_sq <= self.splash_radius**2:
-                reward = enemy.take_damage(self.damage)
-                money_callback(reward)
-
-
-class Button:  # Classe para os botões de construção na UI.
-    def __init__(self, x, y, width, height, image, cost):
-        self.rect = pygame.Rect(x, y, width, height)
-        self.image = pygame.transform.scale(
-            image, (width - 10, height - 10)
-        )  # Reduz para caber
-        self.cost = cost
+class Button:
+    def __init__(
+        self,
+        text,
+        rect,
+        callback,
+        font,
+        bg_color,
+        hover_color,
+        text_color=WHITE,
+        border_radius=8,
+    ):
+        self.rect = pygame.Rect(rect)
+        self.text = text
+        self.callback = callback
+        self.font = font
+        self.bg_color = bg_color
+        self.hover_color = hover_color
+        self.text_color = text_color
+        self.border_radius = border_radius
         self.is_hovered = False
 
-    def draw(self, surface, money):
-        # Cor de fundo baseada no estado
-        if self.is_hovered and money >= self.cost:
-            bg_color = GREEN
-        elif self.is_hovered:
-            bg_color = RED  # Hover, mas sem dinheiro
-        elif money < self.cost:
-            bg_color = GREY  # Sem dinheiro
-        else:
-            bg_color = BLACK  # Normal
+    def draw(self, surface):
+        color = self.hover_color if self.is_hovered else self.bg_color
+        pygame.draw.rect(surface, color, self.rect, border_radius=self.border_radius)
 
-        pygame.draw.rect(surface, bg_color, self.rect)
-        pygame.draw.rect(surface, WHITE, self.rect, 2)  # Borda
+        text_surf = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        surface.blit(text_surf, text_rect)
 
-        # Centraliza a imagem
-        img_rect = self.image.get_rect(center=self.rect.center)
-        surface.blit(self.image, img_rect)
+    # handle_event simplificado para não receber 'mouse_pos'
+    def handle_event(self, event):
+        mouse_pos = pygame.mouse.get_pos()  # Pega o mouse_pos aqui
+        if event.type == pygame.MOUSEMOTION:
+            self.is_hovered = self.rect.collidepoint(mouse_pos)
 
-        # Desenha o custo
-        draw_text(
-            f"${self.cost}",
-            font_small,
-            WHITE,
-            surface,
-            self.rect.centerx,
-            self.rect.bottom - 10,
-            center=True,
-        )
-
-    def check_hover(self, mouse_pos):
-        self.is_hovered = self.rect.collidepoint(mouse_pos)
-
-    def is_clicked(self, mouse_pos):
-        return self.rect.collidepoint(mouse_pos)
-
-
-# =============================================================================
-# 3. FUNÇÕES AUXILIARES
-# =============================================================================
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.is_hovered:
+                self.callback()
+                return True
+        return False
 
 
 def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
@@ -556,7 +122,6 @@ def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     if center:
         text_rect.center = (x, y)
     elif v_center:
-        # Alinha à esquerda em X, mas centraliza verticalmente em Y
         text_rect.left = x
         text_rect.centery = y
     else:
@@ -564,551 +129,316 @@ def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     surface.blit(text_obj, text_rect)
 
 
-def draw_ui(
-    surface, lives, money, wave, total_waves, buttons
-):  # Desenha a UI  na parte inferior.
-    panel_rect = pygame.Rect(0, GAME_HEIGHT, SCREEN_WIDTH, UI_PANEL_HEIGHT)
-    pygame.draw.rect(surface, BLACK, panel_rect)
-    pygame.draw.rect(surface, WHITE, panel_rect, 2)  # Borda
-
-    # Stats
-    draw_text(f"Vidas: {lives}", font_medium, WHITE, surface, 20, GAME_HEIGHT + 10)
-    draw_text(f"Dinheiro: ${money}", font_medium, WHITE, surface, 20, GAME_HEIGHT + 50)
-    draw_text(
-        f"Onda: {wave} / {total_waves}",
-        font_medium,
-        WHITE,
-        surface,
-        SCREEN_WIDTH - 200,
-        GAME_HEIGHT + 35,
-    )
-
-    # Botoes
-    for key, button in buttons.items():
-        button.draw(surface, money)
+# Função get_scaled_mouse_pos REMOVIDA
 
 
-def draw_tower_slots(
-    surface, selected_tower_type
-):  # pega as coordenadas dos slots que podem ser construidos e desenha eles
-    for i, rect in enumerate(TORRE_SLOT_RECTS):
-        # Só desenha slots vazios
-        if i not in occupied_slots:
-            # Se estiver construindo, mostra um círculo verde
-            if selected_tower_type:
-                pygame.draw.circle(surface, GREEN, rect.center, 24, 3)
-            # Senão, um círculo cinza sutil
-            else:
-                pygame.draw.circle(surface, (50, 50, 50), rect.center, 24, 2)
+# Funções 'run' simplificadas para passar 'screen' e não 'virtual_screen'
+def run_tower_defense():
+    tower_defense_game.main(screen, clock)  # Não passa mais 'scales'
 
 
-def draw_tower_preview(
-    surface, mouse_pos, tower_type
-):  # Desenha o preview da torre no mouse
-    if not tower_type:
-        return
-
-    data = TOWER_DATA[tower_type]
-    image = data["image"]
-    range_val = data["range"]
-
-    # Desenha o alcance
-    range_surface = pygame.Surface((range_val * 2, range_val * 2), pygame.SRCALPHA)
-    pygame.draw.circle(
-        range_surface, (255, 255, 255, 50), (range_val, range_val), range_val
-    )
-    surface.blit(range_surface, (mouse_pos[0] - range_val, mouse_pos[1] - range_val))
-
-    # Desenha a torre
-    surface.blit(
-        image,
-        (mouse_pos[0] - image.get_width() // 2, mouse_pos[1] - image.get_height() // 2),
-    )
+def run_snake():
+    snake_game.main(screen, clock)
 
 
-# =============================================================================
-# 4. LOOP PRINCIPAL (Máquina de Estados)
-# =============================================================================
+def run_ping_pong():
+    ping_pong_game.main(screen, clock)
 
 
-def main():  # Função principal do jogo
+def run_tic_tac_toe():
+    tic_tac_toe_game.main(screen, clock)  # Não passa mais 'scales'
+
+
+def run_space_invaders():
+    space_invaders_game.main(screen, clock)
+
+
+def run_flappy_bird():
+    flappy_bird_game.main(screen, clock)
+
+
+def run_pacman():
+    pacman_game.main(screen, clock)
+
+
+# run_raycaster REMOVIDA
+
+
+def main():
     global auth
-    running = True
-    game_state = "LOGIN"  # Estados: LOGIN, START_MENU, PLAYING, GAME_OVER, WIN
+    game_state = "LOGIN"
+
+    if auth is None:
+        game_state = "MENU"
+
     email_input = ""
     password_input = ""
-    active_field = None  # Campo ativo para digitação
+    active_field = None
     login_message = ""
 
     input_width = 400
-    input_height = 40
-    button_width = 180
+    input_height = 50
+    button_width = 190
     button_height = 50
-    center_x = SCREEN_WIDTH // 2
+    center_x = SCREEN_WIDTH // 2  # Usa SCREEN_WIDTH
 
     email_rect = pygame.Rect(
         center_x - (input_width // 2), 250, input_width, input_height
     )
     password_rect = pygame.Rect(
-        center_x - (input_width // 2), 340, input_width, input_height
+        center_x - (input_width // 2), 330, input_width, input_height
     )
 
-    login_button_rect = pygame.Rect(email_rect.left, 420, button_width, button_height)
-    register_button_rect = pygame.Rect(
-        email_rect.right - button_width, 420, button_width, button_height
+    def do_login():
+        nonlocal login_message, game_state, email_input, password_input, active_field
+        try:
+            user = auth.sign_in_with_email_and_password(email_input, password_input)
+            game_state = "MENU"
+            email_input = ""
+            password_input = ""
+            active_field = None
+        except Exception as e:
+            login_message = "Email ou senha inválidos."
+
+    def do_register():
+        nonlocal login_message
+        try:
+            user = auth.create_user_with_email_and_password(email_input, password_input)
+            login_message = "Registrado! Faça o login."
+        except Exception as e:
+            try:
+                error_info = e.args[1]
+                if "EMAIL_EXISTS" in error_info:
+                    login_message = "Email já cadastrado."
+                elif "WEAK_PASSWORD" in error_info:
+                    login_message = "Senha fraca (mín. 6 chars)."
+                else:
+                    login_message = "Erro no registro."
+            except (IndexError, TypeError, KeyError):
+                login_message = "Erro no registro."
+
+    login_button = Button(
+        "Login",
+        (email_rect.left, 410, button_width, button_height),
+        do_login,
+        font_small,
+        PRIMARY_COLOR,
+        PRIMARY_HOVER,
     )
 
-    if auth is None:  # fallback de erro
-        game_state = "START_MENU"
-        print("AVISO: Firebase não inicializado. Pulando login.")
+    register_button = Button(
+        "Registrar",
+        (email_rect.right - button_width, 410, button_width, button_height),
+        do_register,
+        font_small,
+        SECONDARY_COLOR,
+        SECONDARY_HOVER,
+    )
 
-    # Variáveis do Jogo
-    lives = INITIAL_LIVES
-    money = INITIAL_MONEY
-    wave = 0
-    total_waves = len(WAVE_DEFINITIONS)
+    login_buttons = [login_button, register_button]
 
-    # Grupos dos sprites
-    enemy_group = pygame.sprite.Group()
-    tower_group = pygame.sprite.Group()
-    projectile_group = pygame.sprite.Group()
+    btn_w, btn_h = 280, 70
+    col1, col2, col3, col4 = 100, 400, 700, 980
 
-    # Variáveis de controle
-    selected_tower_type = None  # zera a torre selecionada
-    occupied_slots.clear()  # Limpa todos os slots ocupados no reinício
-
-    # UI
-    buttons = {
-        "arrow": Button(
-            300,
-            GAME_HEIGHT + 10,
-            80,
-            80,
-            TOWER_DATA["arrow"]["image"],
-            TOWER_DATA["arrow"]["cost"],
+    game_buttons = [
+        Button(
+            "Tower Defense",
+            (col1, 200, btn_w, btn_h),
+            run_tower_defense,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
         ),
-        "cannon": Button(
-            400,
-            GAME_HEIGHT + 10,
-            80,
-            80,
-            TOWER_DATA["cannon"]["image"],
-            TOWER_DATA["cannon"]["cost"],
+        Button(
+            "Snake",
+            (col2, 200, btn_w, btn_h),
+            run_snake,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
         ),
-    }
+        Button(
+            "Ping Pong",
+            (col3, 200, btn_w, btn_h),
+            run_ping_pong,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
+        ),
+        Button(
+            "Jogo da Velha",
+            (col4, 200, btn_w, btn_h),
+            run_tic_tac_toe,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
+        ),
+        Button(
+            "Space Invaders",
+            (col1, 300, btn_w, btn_h),
+            run_space_invaders,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
+        ),
+        Button(
+            "Flappy Bird",
+            (col2, 300, btn_w, btn_h),
+            run_flappy_bird,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
+        ),
+        Button(
+            "Pac-Man",
+            (col3, 300, btn_w, btn_h),
+            run_pacman,
+            font_small,
+            PRIMARY_COLOR,
+            PRIMARY_HOVER,
+        ),
+        # Botão "Raycaster 3D" removido
+    ]
 
-    # Controle de waves
-    wave_in_progress = False
-    wave_spawn_list = []
-    last_spawn_time = 0
-    spawn_delay = 1000  # 1 segundo entre inimigos
-
-    # Callback para projéteis adicionarem dinheiro
-    def add_money(amount):
-        nonlocal money
-        money += amount
-
-    if background_music:
-        background_music.play(loops=-1)
-
+    running = True
     while running:
-        # --- 6.1. Controle de FPS ---
-        clock.tick(FPS)
+        # virtual_mouse_pos REMOVIDO
 
-        mouse_pos = pygame.mouse.get_pos()
-
-        # --- 6.2. Processamento dos eventos ---
-        events = (
-            pygame.event.get()
-        )  # Pega todos os eventos do jogo usando o modulo importado do pygame
-        for event in events:  # para cada evento na lista de eventos
-            if event.type == pygame.QUIT:  # se for o evento de fechar a janela
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
                 running = False
 
-            if (
-                event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE
-            ):  # se for apertado ESC
-                selected_tower_type = None  # Cancela construção
-
-            # --- Eventos por Estado ---
-
+            # scaled_event REMOVIDO. Passa 'event' normal
             if game_state == "LOGIN":
+                for btn in login_buttons:
+                    btn.handle_event(event)  # Passa 'event'
+
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     login_message = ""
-                    if email_rect.collidepoint(event.pos):
+                    if email_rect.collidepoint(event.pos):  # Usa 'event.pos'
                         active_field = "email"
-                    elif password_rect.collidepoint(event.pos):
+                    elif password_rect.collidepoint(event.pos):  # Usa 'event.pos'
                         active_field = "password"
-                    elif login_button_rect.collidepoint(event.pos):
-                        try:
-                            user = auth.sign_in_with_email_and_password(
-                                email_input, password_input
-                            )
-                            print("Login com sucesso! ID:", user["localId"])
-                            game_state = "START_MENU"
-                            email_input = ""
-                            password_input = ""
-                            active_field = None
-                        except Exception as e:
-                            print(
-                                "Falha no login:", e
-                            )  # o e é a mensagem de erro retornada pelo firebase
-                            login_message = "Email ou senha inválidos."
-
-                    elif register_button_rect.collidepoint(event.pos):
-                        try:
-                            user = auth.create_user_with_email_and_password(
-                                email_input, password_input
-                            )
-                            print("Registro com sucesso! ID:", user["localId"])
-                            login_message = "Registrado! Faça o login."
-                        except Exception as e:
-                            print("Falha no registro:", e)
-                            try:
-                                # Tenta decodificar a mensagem de erro JSON do Firebase para obter o código de erro específico segundo o proprio fb
-                                error_info = e.args[
-                                    1
-                                ]  # Pega a segunda parte da exceção
-                                if "EMAIL_EXISTS" in error_info:
-                                    login_message = "Email já cadastrado."
-                                elif "WEAK_PASSWORD" in error_info:
-                                    login_message = "Senha fraca (mín. 6 chars)."
-                                else:
-                                    login_message = "Erro no registro."
-                            except (IndexError, TypeError, KeyError):
-                                login_message = "Erro no registro."
-
                     else:
-                        active_field = None  # pra qnd clica fora
+                        active_field = None
 
                 if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_RETURN:
+                        if active_field == "email":
+                            active_field = "password"
+                        elif active_field == "password":
+                            do_login()
+
                     if active_field == "email":
                         if event.key == pygame.K_BACKSPACE:
                             email_input = email_input[:-1]
-                        elif event.key != pygame.K_TAB and event.key != pygame.K_RETURN:
+                        elif event.key != pygame.K_TAB:
                             email_input += event.unicode
                     elif active_field == "password":
                         if event.key == pygame.K_BACKSPACE:
                             password_input = password_input[:-1]
-                        elif event.key != pygame.K_TAB and event.key != pygame.K_RETURN:
+                        elif event.key != pygame.K_TAB:
                             password_input += event.unicode
 
-            elif game_state == "START_MENU":
-                if (
-                    event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE
-                ):  # se apertar espaço
-                    game_state = "PLAYING"  # muda o estado para jogando
-                    wave = 0  # Reseta a onda para 0 para forçar o início da onda 1
+            elif game_state == "MENU":
+                for button in game_buttons:
+                    button.handle_event(event)  # Passa 'event'
 
-            elif game_state == "PLAYING":  # se estiver jogando
-                if event.type == pygame.USEREVENT and event.tipo == "enemy_leaked":  #
-                    lives -= 1
-                    if sfx_life_lost:
-                        sfx_life_lost.play()
-                    if lives <= 0:
-                        game_state = "GAME_OVER"
-                        if background_music:
-                            background_music.stop()
-
-                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    clicked_button = False
-                    for tower_type, button in buttons.items():
-                        if button.is_clicked(mouse_pos):
-                            if money >= button.cost:
-                                selected_tower_type = tower_type
-                                print(f"Modo de construção: {tower_type}")
-                            else:
-                                print("Dinheiro insuficiente.")
-                            clicked_button = True
-                            break
-
-                    # 2. Se não clicou na UI e está construindo, clicou em um slot?
-                    if not clicked_button and selected_tower_type:
-                        for i, rect in enumerate(TORRE_SLOT_RECTS):
-                            if i not in occupied_slots and rect.collidepoint(mouse_pos):
-                                # Construir a torre
-                                cost = TOWER_DATA[selected_tower_type]["cost"]
-                                if money >= cost:
-                                    money -= cost
-                                    new_tower = Tower(selected_tower_type, rect.center)
-                                    tower_group.add(new_tower)
-                                    occupied_slots.append(i)
-                                    if sfx_build:
-                                        sfx_build.play()
-                                    print(
-                                        f"Torre {selected_tower_type} construída no slot {i}"
-                                    )
-                                    selected_tower_type = (
-                                        None  # Sai do modo de construção
-                                    )
-                                else:
-                                    print("Dinheiro insuficiente.")
-                                break
-
-            elif game_state == "GAME_OVER" or game_state == "WIN":
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    # Reinicia o jogo
-                    game_state = "START_MENU"
-                    lives = INITIAL_LIVES
-                    money = INITIAL_MONEY
-                    wave = 0
-                    enemy_group.empty()
-                    tower_group.empty()
-                    projectile_group.empty()
-                    occupied_slots.clear()
-                    wave_in_progress = False
-                    wave_spawn_list = []
-                    if background_music:
-                        background_music.play(loops=-1)
-
-        if game_state == "PLAYING":
-            for button in buttons.values():
-                button.check_hover(mouse_pos)
-
-            # Atualiza Sprites
-            enemy_group.update()
-            tower_group.update(enemy_group, projectile_group)
-            projectile_group.update(enemy_group, add_money)  # Passa inimigos e callback
-
-            # Lógica das ondas
-            if (
-                not wave_in_progress and not enemy_group
-            ):  # garante que só comece nova wave se a anterior acabou
-                if wave < total_waves:
-                    wave += 1
-                    wave_in_progress = True
-                    wave_spawn_list = []
-
-                    current_wave_data = WAVE_DEFINITIONS[wave - 1]
-                    for enemy_type, count in current_wave_data.items():
-                        wave_spawn_list.extend([enemy_type] * count)
-                    random.shuffle(wave_spawn_list)
-
-                    last_spawn_time = pygame.time.get_ticks()
-                else:
-                    # ganho o jogo
-                    game_state = "WIN"
-                    if background_music:
-                        background_music.stop()  # para a musica de fundo (funciona pois 	ela é carregada como objeto Sound)
-
-            if wave_in_progress:
-                now = pygame.time.get_ticks()  # pega o tempo atual
-                if (
-                    wave_spawn_list and now - last_spawn_time >= spawn_delay
-                ):  # se tiver waves para acontecer e tempo desde o ultimo spawn for maior q o delay , spawna um inimigo
-                    enemy_type_to_spawn = wave_spawn_list.pop(0)  # tira 1 inimigo
-                    new_enemy = Enemy(enemy_type_to_spawn, WAYPOINTS)  # "cria"o inimigo
-                    enemy_group.add(new_enemy)  # adiciona ao grupo de inimigos
-                    last_spawn_time = now  # reseta o delay
-
-                if not wave_spawn_list:
-                    wave_in_progress = False  # garante q nao gere 2 waves juntas
-
-        screen.fill(BLACK)
+        screen.fill(BG_COLOR)  # Desenha na 'screen'
 
         if game_state == "LOGIN":
-            screen.blit(background_image, (0, 0))  # Desenha o mapa como fundo
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))
-            screen.blit(overlay, (0, 0))
-
             draw_text(
-                "TOWER DEFENSE - LOGIN",
+                "HUB DE JOGOS - LOGIN",
                 font_large,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
+                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
                 150,
                 center=True,
             )
 
             draw_text(
                 "Email:",
-                font_medium,
-                WHITE,
-                screen,
+                font_small,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
                 email_rect.left,
                 email_rect.top - 28,
+                center=False,
             )
-            border_color_email = GREEN if active_field == "email" else WHITE
-            pygame.draw.rect(screen, BLACK, email_rect)  # Fundo da caixa
-            pygame.draw.rect(screen, border_color_email, email_rect, 2)  # Borda
+            border_color_email = FOCUS_COLOR if active_field == "email" else TEXT_COLOR
+            pygame.draw.rect(screen, INPUT_BG, email_rect, border_radius=8)
+            pygame.draw.rect(screen, border_color_email, email_rect, 2, border_radius=8)
             draw_text(
                 email_input,
-                font_medium,
-                WHITE,
-                screen,
-                email_rect.left + 10,
+                font_small,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
+                email_rect.left + 15,
                 email_rect.centery,
                 v_center=True,
             )
 
             draw_text(
                 "Senha:",
-                font_medium,
-                WHITE,
-                screen,
+                font_small,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
                 password_rect.left,
                 password_rect.top - 28,
+                center=False,
             )
-            border_color_pass = GREEN if active_field == "password" else WHITE
-            pygame.draw.rect(screen, BLACK, password_rect)
-            pygame.draw.rect(screen, border_color_pass, password_rect, 2)
+            border_color_pass = (
+                FOCUS_COLOR if active_field == "password" else TEXT_COLOR
+            )
+            pygame.draw.rect(screen, INPUT_BG, password_rect, border_radius=8)
+            pygame.draw.rect(
+                screen, border_color_pass, password_rect, 2, border_radius=8
+            )
             draw_text(
                 "*" * len(password_input),
-                font_medium,
-                WHITE,
-                screen,
-                password_rect.left + 10,
+                font_small,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
+                password_rect.left + 15,
                 password_rect.centery,
                 v_center=True,
             )
 
-            pygame.draw.rect(screen, GREEN, login_button_rect)
-            draw_text(
-                "Login",
-                font_medium,
-                BLACK,
-                screen,
-                login_button_rect.centerx,
-                login_button_rect.centery,
-                center=True,
-            )
-
-            pygame.draw.rect(screen, LIGHT_BLUE, register_button_rect)
-            draw_text(
-                "Registrar",
-                font_medium,
-                BLACK,
-                screen,
-                register_button_rect.centerx,
-                register_button_rect.centery,
-                center=True,
-            )
+            for btn in login_buttons:
+                btn.draw(screen)  # Usa 'screen'
 
             draw_text(
                 login_message,
-                font_medium,
-                RED,
-                screen,
-                SCREEN_WIDTH / 2,
-                500,
+                font_small,
+                ERROR_COLOR,
+                screen,  # Usa 'screen'
+                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
+                480,
                 center=True,
             )
 
-        elif game_state == "START_MENU":  # landing page
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
+        elif game_state == "MENU":
             draw_text(
-                "TOWER DEFENSE",
+                "HUB DE JOGOS",
                 font_large,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )  # nome do jogo
-            draw_text(
-                "Pressione [ESPAÇO] para começar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
-                center=True,
-            )  # clicar para começar
-
-        elif game_state == "PLAYING":  # após clicar espaco
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_tower_slots(
-                screen, selected_tower_type
-            )  # desenha onde pode construir, chama a funcao q recebe as coordenadas como parametro
-
-            enemy_group.draw(screen)  # desenha os inimigos a cada clock
-            tower_group.draw(screen)  # desenha as torres a cada clock
-            projectile_group.draw(screen)  # desenha os projeteis a cada clock
-
-            for enemy in enemy_group:
-                enemy.draw_health_bar(screen)
-
-            draw_tower_preview(
-                screen, mouse_pos, selected_tower_type
-            )  # desenha preview de construção onde o mouse está
-
-            draw_ui(
-                screen, lives, money, wave, total_waves, buttons
-            )  # desenha a tela e a parte inferior
-
-        elif game_state == "GAME_OVER":  # estado derrota
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_text(
-                "GAME OVER",
-                font_large,
-                RED,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )  #
-            draw_text(
-                f"Você sobreviveu {wave-1} ondas",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
+                TEXT_COLOR,
+                screen,  # Usa 'screen'
+                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
+                100,
                 center=True,
             )
-            draw_text(
-                "Pressione [ESPAÇO] para reiniciar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 60,
-                center=True,
-            )
+            for button in game_buttons:
+                button.draw(screen)  # Usa 'screen'
 
-        elif game_state == "WIN":  # estado vitoria
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_text(
-                "VITÓRIA!",
-                font_large,
-                GREEN,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )
-            draw_text(
-                "Você defendeu todas as ondas!",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
-                center=True,
-            )
-            draw_text(
-                "Pressione [ESPAÇO] para reiniciar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 60,
-                center=True,
-            )
+        # Bloco de 'scaled_surface' REMOVIDO
 
-        pygame.display.flip()  # Update da tela
+        pygame.display.flip()
+        clock.tick(60)
 
-    pygame.quit()  # Encerra o Pygame (convenção encerrar as bibliotecas)
-    sys.exit()  # Encerra o programa
+    pygame.quit()
+    sys.exit()
 
 
-# =============================================================================
-# 5. INICIALIZAÇÃO DO PROGRAMA
-# =============================================================================
-
-if (
-    __name__ == "__main__"
-):  # Garante que o código só rode se o arquivo for executado diretamente
+if __name__ == "__main__":
     main()
