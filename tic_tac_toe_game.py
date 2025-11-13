@@ -5,7 +5,7 @@ import sys
 import math
 
 
-def main(screen, clock):
+def main(screen, clock, cheats_enabled):
     WIDTH = screen.get_width()
     HEIGHT = screen.get_height()
 
@@ -14,6 +14,7 @@ def main(screen, clock):
     LINE_COLOR = (150, 150, 150)
     X_COLOR = (230, 70, 70)
     O_COLOR = (70, 70, 230)
+    GREEN = (0, 255, 0)
 
     BOARD_ROWS = 3
     BOARD_COLS = 3
@@ -32,21 +33,9 @@ def main(screen, clock):
 
     def draw_lines():
         for i in range(1, BOARD_COLS):
-            pygame.draw.line(
-                screen,
-                LINE_COLOR,
-                (OFFSET_X + i * SQUARE_SIZE, 0),
-                (OFFSET_X + i * SQUARE_SIZE, HEIGHT),
-                6,
-            )
+            pygame.draw.line(screen, LINE_COLOR, (OFFSET_X + i * SQUARE_SIZE, 0), (OFFSET_X + i * SQUARE_SIZE, HEIGHT), 6)
         for i in range(1, BOARD_ROWS):
-            pygame.draw.line(
-                screen,
-                LINE_COLOR,
-                (OFFSET_X, i * SQUARE_SIZE),
-                (OFFSET_X + BOARD_COLS * SQUARE_SIZE, i * SQUARE_SIZE),
-                6,
-            )
+            pygame.draw.line(screen, LINE_COLOR, (OFFSET_X, i * SQUARE_SIZE), (OFFSET_X + BOARD_COLS * SQUARE_SIZE, i * SQUARE_SIZE), 6)
 
     def draw_figures(board):
         for row in range(BOARD_ROWS):
@@ -55,25 +44,14 @@ def main(screen, clock):
                 center_y = row * SQUARE_SIZE + SQUARE_SIZE // 2
 
                 if board[row][col] == 1:
-                    pygame.draw.line(
-                        screen,
-                        X_COLOR,
-                        (center_x - 60, center_y - 60),
-                        (center_x + 60, center_y + 60),
-                        15,
-                    )
-                    pygame.draw.line(
-                        screen,
-                        X_COLOR,
-                        (center_x + 60, center_y - 60),
-                        (center_x - 60, center_y + 60),
-                        15,
-                    )
+                    pygame.draw.line(screen, X_COLOR, (center_x - 60, center_y - 60), (center_x + 60, center_y + 60), 15)
+                    pygame.draw.line(screen, X_COLOR, (center_x + 60, center_y - 60), (center_x - 60, center_y + 60), 15)
                 elif board[row][col] == 2:
                     pygame.draw.circle(screen, O_COLOR, (center_x, center_y), 60, 15)
 
     def mark_square(board, row, col, player):
-        if board[row][col] == 0:
+        # Permite P1 (X) sobrescrever P2 (O) se os cheats estiverem ligados
+        if board[row][col] == 0 or (cheats_enabled and player == 1 and board[row][col] == 2):
             board[row][col] = player
             return True
         return False
@@ -154,6 +132,10 @@ def main(screen, clock):
             screen.fill(BLACK)
             draw_lines()
             draw_figures(board)
+
+            if cheats_enabled:
+                text_surf = font_small.render("CHEATS ATIVADOS", True, GREEN)
+                screen.blit(text_surf, (OFFSET_X + 10, 10))
 
             if game_over:
                 draw_game_over(winner_message)

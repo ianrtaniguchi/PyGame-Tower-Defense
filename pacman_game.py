@@ -3,7 +3,7 @@ import sys
 import random
 
 
-def main(screen, clock):
+def main(screen, clock, cheats_enabled):
     WIDTH = screen.get_width()
     HEIGHT = screen.get_height()
 
@@ -57,24 +57,9 @@ def main(screen, clock):
             super().__init__()
             self.image = pygame.Surface((CELL_SIZE - 4, CELL_SIZE - 4))
             self.image.fill(YELLOW)
-            pygame.draw.circle(
-                self.image,
-                BLACK,
-                (self.image.get_width() // 2, self.image.get_height() // 2),
-                CELL_SIZE // 2 - 2,
-            )
-            pygame.draw.circle(
-                self.image,
-                YELLOW,
-                (self.image.get_width() // 2, self.image.get_height() // 2),
-                CELL_SIZE // 2 - 3,
-            )
-            self.rect = self.image.get_rect(
-                topleft=(
-                    MAP_OFFSET_X + x * CELL_SIZE + 2,
-                    MAP_OFFSET_Y + y * CELL_SIZE + 2,
-                )
-            )
+            pygame.draw.circle(self.image, BLACK, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 2 - 2)
+            pygame.draw.circle(self.image, YELLOW, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 2 - 3)
+            self.rect = self.image.get_rect(topleft=(MAP_OFFSET_X + x * CELL_SIZE + 2, MAP_OFFSET_Y + y * CELL_SIZE + 2))
             self.grid_x = x
             self.grid_y = y
             self.direction = (0, 0)
@@ -91,13 +76,7 @@ def main(screen, clock):
                 next_x = self.grid_x + self.next_direction[0]
                 next_y = self.grid_y + self.next_direction[1]
 
-                if (
-                    next_x >= 0
-                    and next_x < GRID_WIDTH
-                    and next_y >= 0
-                    and next_y < GRID_HEIGHT
-                    and MAP[next_y][next_x] != "1"
-                ):
+                if next_x >= 0 and next_x < GRID_WIDTH and next_y >= 0 and next_y < GRID_HEIGHT and MAP[next_y][next_x] != "1":
                     self.direction = self.next_direction
 
             new_rect.x += self.direction[0] * self.speed
@@ -107,13 +86,7 @@ def main(screen, clock):
                 next_x = self.grid_x + self.direction[0]
                 next_y = self.grid_y + self.direction[1]
 
-                if (
-                    next_x < 0
-                    or next_x >= GRID_WIDTH
-                    or next_y < 0
-                    or next_y >= GRID_HEIGHT
-                    or MAP[next_y][next_x] == "1"
-                ):
+                if next_x < 0 or next_x >= GRID_WIDTH or next_y < 0 or next_y >= GRID_HEIGHT or MAP[next_y][next_x] == "1":
                     self.direction = (0, 0)
 
             self.rect = new_rect
@@ -126,12 +99,7 @@ def main(screen, clock):
             super().__init__()
             self.image = pygame.Surface((CELL_SIZE - 4, CELL_SIZE - 4))
             self.image.fill(color)
-            self.rect = self.image.get_rect(
-                topleft=(
-                    MAP_OFFSET_X + x * CELL_SIZE + 2,
-                    MAP_OFFSET_Y + y * CELL_SIZE + 2,
-                )
-            )
+            self.rect = self.image.get_rect(topleft=(MAP_OFFSET_X + x * CELL_SIZE + 2, MAP_OFFSET_Y + y * CELL_SIZE + 2))
             self.grid_x = x
             self.grid_y = y
             self.direction = (0, 0)
@@ -154,13 +122,7 @@ def main(screen, clock):
                     continue
                 next_x = self.grid_x + dx
                 next_y = self.grid_y + dy
-                if (
-                    next_x >= 0
-                    and next_x < GRID_WIDTH
-                    and next_y >= 0
-                    and next_y < GRID_HEIGHT
-                    and MAP[next_y][next_x] != "1"
-                ):
+                if next_x >= 0 and next_x < GRID_WIDTH and next_y >= 0 and next_y < GRID_HEIGHT and MAP[next_y][next_x] != "1":
                     possible_moves.append((dx, dy))
 
             if not possible_moves:
@@ -170,9 +132,7 @@ def main(screen, clock):
                 min_dist = float("inf")
 
                 for move in possible_moves:
-                    dist = abs(self.grid_x + move[0] - player_grid_pos[0]) + abs(
-                        self.grid_y + move[1] - player_grid_pos[1]
-                    )
+                    dist = abs(self.grid_x + move[0] - player_grid_pos[0]) + abs(self.grid_y + move[1] - player_grid_pos[1])
                     if dist < min_dist:
                         min_dist = dist
                         best_move = move
@@ -189,24 +149,9 @@ def main(screen, clock):
             super().__init__()
             self.image = pygame.Surface((CELL_SIZE // 4, CELL_SIZE // 4))
             self.image.fill(WHITE)
-            pygame.draw.circle(
-                self.image,
-                BLACK,
-                (self.image.get_width() // 2, self.image.get_height() // 2),
-                CELL_SIZE // 8,
-            )
-            pygame.draw.circle(
-                self.image,
-                WHITE,
-                (self.image.get_width() // 2, self.image.get_height() // 2),
-                CELL_SIZE // 8 - 1,
-            )
-            self.rect = self.image.get_rect(
-                center=(
-                    MAP_OFFSET_X + x * CELL_SIZE + CELL_SIZE // 2,
-                    MAP_OFFSET_Y + y * CELL_SIZE + CELL_SIZE // 2,
-                )
-            )
+            pygame.draw.circle(self.image, BLACK, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 8)
+            pygame.draw.circle(self.image, WHITE, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 8 - 1)
+            self.rect = self.image.get_rect(center=(MAP_OFFSET_X + x * CELL_SIZE + CELL_SIZE // 2, MAP_OFFSET_Y + y * CELL_SIZE + CELL_SIZE // 2))
 
     def draw_text(text, font, color, surface, x, y, center=True):
         text_obj = font.render(text, True, color)
@@ -221,12 +166,7 @@ def main(screen, clock):
         for y, row in enumerate(MAP):
             for x, char in enumerate(row):
                 if char == "1":
-                    wall_rect = pygame.Rect(
-                        MAP_OFFSET_X + x * CELL_SIZE,
-                        MAP_OFFSET_Y + y * CELL_SIZE,
-                        CELL_SIZE,
-                        CELL_SIZE,
-                    )
+                    wall_rect = pygame.Rect(MAP_OFFSET_X + x * CELL_SIZE, MAP_OFFSET_Y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                     pygame.draw.rect(surface, BLUE, wall_rect)
                     walls.append(wall_rect)
 
@@ -239,12 +179,7 @@ def main(screen, clock):
         player = Player(1, 1)
         all_sprites.add(player)
 
-        ghost_list = [
-            Ghost(12, 8, RED),
-            Ghost(13, 8, GREEN),
-            Ghost(14, 8, PINK),
-            Ghost(15, 8, ORANGE),
-        ]
+        ghost_list = [Ghost(12, 8, RED), Ghost(13, 8, GREEN), Ghost(14, 8, PINK), Ghost(15, 8, ORANGE)]
         for g in ghost_list:
             all_sprites.add(g)
             ghosts.add(g)
@@ -288,25 +223,9 @@ def main(screen, clock):
                 screen.fill(BLACK)
                 message = "VOCÊ VENCEU!" if game_won else "GAME OVER"
                 color = YELLOW if game_won else RED
-                draw_text(
-                    message, font_large, color, screen, WIDTH / 2, HEIGHT / 2 - 40
-                )
-                draw_text(
-                    f"Pontuação: {score}",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 20,
-                )
-                draw_text(
-                    "Pressione [ESPAÇO] para reiniciar ou [ESC] para sair",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 60,
-                )
+                draw_text(message, font_large, color, screen, WIDTH / 2, HEIGHT / 2 - 40)
+                draw_text(f"Pontuação: {score}", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 20)
+                draw_text("Pressione [ESPAÇO] para reiniciar ou [ESC] para sair", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
                 pygame.display.flip()
                 clock.tick(60)
                 continue
@@ -319,7 +238,7 @@ def main(screen, clock):
             if eaten_pellets:
                 score += len(eaten_pellets) * 10
 
-            if pygame.sprite.spritecollide(player, ghosts, False):
+            if not cheats_enabled and pygame.sprite.spritecollide(player, ghosts, False):
                 game_over = True
 
             if len(pellets) == 0:
@@ -333,9 +252,10 @@ def main(screen, clock):
             pellets.draw(screen)
             all_sprites.draw(screen)
 
-            draw_text(
-                f"Pontuação: {score}", font_small, WHITE, screen, 10, 10, center=False
-            )
+            draw_text(f"Pontuação: {score}", font_small, WHITE, screen, 10, 10, center=False)
+
+            if cheats_enabled:
+                draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, WIDTH - 100, 10, center=False)
 
             pygame.display.flip()
             clock.tick(60)

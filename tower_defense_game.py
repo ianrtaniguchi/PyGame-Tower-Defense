@@ -31,42 +31,29 @@ import sys
 import math
 import random
 from pathlib import Path
-import pyrebase
-
-firebaseConfig = {
-    "apiKey": "AIzaSyB6p7OSeA19GyE1lypGTfWe-_Otbt2b0f8",
-    "authDomain": "mechanical-tower-defense.firebaseapp.com",
-    "databaseURL": "https://mechanical-tower-defense.firebaseio.com",
-    "storageBucket": "mechanical-tower-defense.appspot.com",
-}
-try:
-    firebase = pyrebase.initialize_app(firebaseConfig)
-    auth = firebase.auth()
-    print("Firebase inicializado com sucesso.")
-except Exception as e:
-    print(f"ERRO CRÍTICO: Falha ao inicializar o Firebase: {e}")
-    print("O jogo pode não funcionar online. Verifique as credenciais e a conexão.")
-    auth = None
+import os  # Importado para o PyInstaller
 
 # =============================================================================
 # 1. CONFIGURAÇÕES INICIAIS
 # =============================================================================
 
 # Inicializa o Pygame e o mixer de áudio
-pygame.init()
-pygame.mixer.init()
+# (Removido, o hub cuida disso)
 
 # Configuração do Pathlib (para garantir que funcione em qualquer pasta)
-try:
-    BASE_DIR = Path(__file__).resolve().parent
-    ASSETS_DIR = BASE_DIR / "assets"
-    IMAGES_DIR = ASSETS_DIR / "images"
-    SOUNDS_DIR = ASSETS_DIR / "sounds"
-except NameError:
-    BASE_DIR = Path(".").resolve()  # .resolve() pega o path absoluto da pasta atual (pathlib)
-    ASSETS_DIR = BASE_DIR / "assets"
-    IMAGES_DIR = ASSETS_DIR / "images"
-    SOUNDS_DIR = ASSETS_DIR / "sounds"
+if getattr(sys, "frozen", False):
+    # Se estiver rodando em um .exe (congelado pelo PyInstaller)
+    BASE_DIR = Path(sys._MEIPASS)
+else:
+    # Se estiver rodando como script .py normal
+    try:
+        BASE_DIR = Path(__file__).resolve().parent
+    except NameError:
+        BASE_DIR = Path(".").resolve()
+
+ASSETS_DIR = BASE_DIR / "assets"
+IMAGES_DIR = ASSETS_DIR / "images"
+SOUNDS_DIR = ASSETS_DIR / "sounds"
 
 
 # consts da screen
@@ -91,10 +78,10 @@ BLUE = (0, 0, 255)
 GREY = (100, 100, 100)
 ORANGE = (255, 165, 0)
 
-# Configurações da janela, seta padrao pra ficar formato bom para todos monitores
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))  # seta o tamanho da janela, de acordo com as consts ja setadas
-pygame.display.set_caption("Tower Defense")  # titulo da janela
-clock = pygame.time.Clock()  # seta o clock para controlar fps
+# Configurações da janela (Removido, o hub cuida disso)
+# screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+# pygame.display.set_caption("Tower Defense")
+# clock = pygame.time.Clock()
 
 # --- Métodos auxiliares para carregar as mídias ---
 
@@ -316,7 +303,7 @@ class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
 
         self.pos = pygame.math.Vector2(pos)
         self.tower_type = tower_type
-        self.data = TOWER_DATA[tower_type]
+        self.data = TOWER_DATA[tower_type]  # Usa o TOWER_DATA global (que pode estar modificado)
 
         self.image = self.data["image"]
         self.range = self.data["range"]
@@ -482,8 +469,6 @@ class Button:  # Classe para os botões de construção na UI.
 # 3. FUNÇÕES AUXILIARES
 # =============================================================================
 
-# Desenha tudo relacionado a UI e textos na tela
-
 
 def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     text_obj = font.render(text, True, color)
@@ -558,36 +543,32 @@ def draw_tower_preview(surface, mouse_pos, tower_type):  # Desenha o preview da 
 # =============================================================================
 
 
-def main(screen, clock):  # Função principal do jogo
-    global auth
+def main(screen, clock, cheats_enabled):  # Função principal do jogo
     running = True
-    game_state = "LOGIN"  # Estados: LOGIN, START_MENU, PLAYING, GAME_OVER, WIN
-    email_input = ""
-    password_input = ""
-    active_field = None  # Campo ativo para digitação
-    login_message = ""
-
-    input_width = 400
-    input_height = 40
-    button_width = 180
-    button_height = 50
-    center_x = SCREEN_WIDTH // 2
-
-    email_rect = pygame.Rect(center_x - (input_width // 2), 250, input_width, input_height)
-    password_rect = pygame.Rect(center_x - (input_width // 2), 340, input_width, input_height)
-
-    login_button_rect = pygame.Rect(email_rect.left, 420, button_width, button_height)
-    register_button_rect = pygame.Rect(email_rect.right - button_width, 420, button_width, button_height)
-
-    if auth is None:  # fallback de erro
-        game_state = "START_MENU"
-        print("AVISO: Firebase não inicializado. Pulando login.")
+    game_state = "START_MENU"  # Pula o LOGIN, o hub já fez isso
 
     # Variáveis do Jogo
     lives = INITIAL_LIVES
     money = INITIAL_MONEY
     wave = 0
     total_waves = len(WAVE_DEFINITIONS)
+
+    # --- LÓGICA DE CHEAT ---
+    if cheats_enabled:
+        money = 99999
+        lives = 99
+        # Modifica permanentemente (para esta sessão) os stats da torre
+        TOWER_DATA["arrow"]["fire_rate"] = 100
+        TOWER_DATA["cannon"]["fire_rate"] = 500
+        TOWER_DATA["arrow"]["damage"] = 100
+        TOWER_DATA["cannon"]["damage"] = 200
+    else:
+        # Garante que os valores voltem ao normal se o cheat for desativado no hub
+        TOWER_DATA["arrow"]["fire_rate"] = 1000
+        TOWER_DATA["cannon"]["fire_rate"] = 2000
+        TOWER_DATA["arrow"]["damage"] = 25
+        TOWER_DATA["cannon"]["damage"] = 50
+    # --- FIM DA LÓGICA DE CHEAT ---
 
     # Grupos dos sprites
     enemy_group = pygame.sprite.Group()
@@ -643,82 +624,35 @@ def main(screen, clock):  # Função principal do jogo
         for event in events:  # para cada evento na lista de eventos
             if event.type == pygame.QUIT:  # se for o evento de fechar a janela
                 running = False
+                if background_music:
+                    background_music.stop()  # Para a música ao sair
 
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:  # se for apertado ESC
-                selected_tower_type = None  # Cancela construção
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    selected_tower_type = None  # Cancela construção
+                    running = False  # Sai para o menu do hub
+                    if background_music:
+                        background_music.stop()
 
             # --- Eventos por Estado ---
 
-            if game_state == "LOGIN":
-                if event.type == pygame.MOUSEBUTTONDOWN:
-                    login_message = ""
-                    if email_rect.collidepoint(event.pos):
-                        active_field = "email"
-                    elif password_rect.collidepoint(event.pos):
-                        active_field = "password"
-                    elif login_button_rect.collidepoint(event.pos):
-                        try:
-                            user = auth.sign_in_with_email_and_password(email_input, password_input)
-                            print("Login com sucesso! ID:", user["localId"])
-                            game_state = "START_MENU"
-                            email_input = ""
-                            password_input = ""
-                            active_field = None
-                        except Exception as e:
-                            print("Falha no login:", e)  # o e é a mensagem de erro retornada pelo firebase
-                            login_message = "Email ou senha inválidos."
-
-                    elif register_button_rect.collidepoint(event.pos):
-                        try:
-                            print("Registro somente pode ser feito por administradores!")
-                            # user = auth.create_user_with_email_and_password(
-                            #     email_input, password_input
-                            # )
-                            print("Registro com sucesso! ID:", user["localId"])
-                            login_message = "Registrado! Faça o login."
-                        except Exception as e:
-                            print("Falha no registro:", e)
-                            try:
-                                # Tenta decodificar a mensagem de erro JSON do Firebase para obter o código de erro específico segundo o proprio fb
-                                error_info = e.args[1]  # Pega a segunda parte da exceção
-                                if "EMAIL_EXISTS" in error_info:
-                                    login_message = "Email já cadastrado."
-                                elif "WEAK_PASSWORD" in error_info:
-                                    login_message = "Senha fraca (mín. 6 chars)."
-                                else:
-                                    login_message = "Erro no registro."
-                            except (IndexError, TypeError, KeyError):
-                                login_message = "Erro no registro."
-
-                    else:
-                        active_field = None  # pra qnd clica fora
-
-                if event.type == pygame.KEYDOWN:
-                    if active_field == "email":
-                        if event.key == pygame.K_BACKSPACE:
-                            email_input = email_input[:-1]
-                        elif event.key != pygame.K_TAB and event.key != pygame.K_RETURN:
-                            email_input += event.unicode
-                    elif active_field == "password":
-                        if event.key == pygame.K_BACKSPACE:
-                            password_input = password_input[:-1]
-                        elif event.key != pygame.K_TAB and event.key != pygame.K_RETURN:
-                            password_input += event.unicode
-
-            elif game_state == "START_MENU":
+            if game_state == "START_MENU":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:  # se apertar espaço
                     game_state = "PLAYING"  # muda o estado para jogando
                     wave = 0  # Reseta a onda para 0 para forçar o início da onda 1
 
             elif game_state == "PLAYING":  # se estiver jogando
-                if event.type == pygame.USEREVENT and event.tipo == "enemy_leaked":  #
-                    lives -= 1
-                    if sfx_life_lost:
-                        sfx_life_lost.play()
-                    if lives <= 0:
-                        game_state = "GAME_OVER"
-                        if background_music:
-                            background_music.stop()
+                if event.type == pygame.USEREVENT and event.tipo == "enemy_leaked":
+                    # --- LÓGICA DE CHEAT ---
+                    if not cheats_enabled:  # Só perde vida se o cheat estiver desligado
+                        lives -= 1
+                        if sfx_life_lost:
+                            sfx_life_lost.play()
+                        if lives <= 0:
+                            game_state = "GAME_OVER"
+                            if background_music:
+                                background_music.stop()
+                    # --- FIM DA LÓGICA DE CHEAT ---
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     clicked_button = False
@@ -732,6 +666,7 @@ def main(screen, clock):  # Função principal do jogo
                             clicked_button = True
                             break
 
+                    # 2. Se não clicou na UI e está construindo, clicou em um slot?
                     if not clicked_button and selected_tower_type:
                         for i, rect in enumerate(TORRE_SLOT_RECTS):
                             if i not in occupied_slots and rect.collidepoint(mouse_pos):
@@ -751,20 +686,32 @@ def main(screen, clock):  # Função principal do jogo
                                 break
 
             elif game_state == "GAME_OVER" or game_state == "WIN":
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
-                    # Reinicia o jogo
-                    game_state = "START_MENU"
-                    lives = INITIAL_LIVES
-                    money = INITIAL_MONEY
-                    wave = 0
-                    enemy_group.empty()
-                    tower_group.empty()
-                    projectile_group.empty()
-                    occupied_slots.clear()
-                    wave_in_progress = False
-                    wave_spawn_list = []
-                    if background_music:
-                        background_music.play(loops=-1)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        # Reinicia o jogo
+                        game_state = "START_MENU"
+                        lives = INITIAL_LIVES
+                        money = INITIAL_MONEY
+
+                        # --- LÓGICA DE CHEAT ---
+                        if cheats_enabled:
+                            money = 99999
+                            lives = 99
+                        # --- FIM DA LÓGICA DE CHEAT ---
+
+                        wave = 0
+                        enemy_group.empty()
+                        tower_group.empty()
+                        projectile_group.empty()
+                        occupied_slots.clear()
+                        wave_in_progress = False
+                        wave_spawn_list = []
+                        if background_music:
+                            background_music.play(loops=-1)
+                    elif event.key == pygame.K_ESCAPE:
+                        running = False  # Sai para o menu do hub
+                        if background_music:
+                            background_music.stop()
 
         if game_state == "PLAYING":
             for button in buttons.values():
@@ -807,97 +754,7 @@ def main(screen, clock):  # Função principal do jogo
 
         screen.fill(BLACK)
 
-        if game_state == "LOGIN":
-            screen.blit(background_image, (0, 0))  # Desenha o mapa como fundo
-            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-            overlay.fill((0, 0, 0, 180))
-            screen.blit(overlay, (0, 0))
-
-            draw_text(
-                "TOWER DEFENSE - LOGIN",
-                font_large,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                150,
-                center=True,
-            )
-
-            draw_text(
-                "Email:",
-                font_medium,
-                WHITE,
-                screen,
-                email_rect.left,
-                email_rect.top - 28,
-            )
-            border_color_email = GREEN if active_field == "email" else WHITE
-            pygame.draw.rect(screen, BLACK, email_rect)  # Fundo da caixa
-            pygame.draw.rect(screen, border_color_email, email_rect, 2)  # Borda
-            draw_text(
-                email_input,
-                font_medium,
-                WHITE,
-                screen,
-                email_rect.left + 10,
-                email_rect.centery,
-                v_center=True,
-            )
-
-            draw_text(
-                "Senha:",
-                font_medium,
-                WHITE,
-                screen,
-                password_rect.left,
-                password_rect.top - 28,
-            )
-            border_color_pass = GREEN if active_field == "password" else WHITE
-            pygame.draw.rect(screen, BLACK, password_rect)
-            pygame.draw.rect(screen, border_color_pass, password_rect, 2)
-            draw_text(
-                "*" * len(password_input),
-                font_medium,
-                WHITE,
-                screen,
-                password_rect.left + 10,
-                password_rect.centery,
-                v_center=True,
-            )
-
-            pygame.draw.rect(screen, GREEN, login_button_rect)
-            draw_text(
-                "Login",
-                font_medium,
-                BLACK,
-                screen,
-                login_button_rect.centerx,
-                login_button_rect.centery,
-                center=True,
-            )
-
-            pygame.draw.rect(screen, LIGHT_BLUE, register_button_rect)
-            draw_text(
-                "Registrar",
-                font_medium,
-                BLACK,
-                screen,
-                register_button_rect.centerx,
-                register_button_rect.centery,
-                center=True,
-            )
-
-            draw_text(
-                login_message,
-                font_medium,
-                RED,
-                screen,
-                SCREEN_WIDTH / 2,
-                500,
-                center=True,
-            )
-
-        elif game_state == "START_MENU":  # landing page
+        if game_state == "START_MENU":  # landing page
             screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
             draw_text(
                 "TOWER DEFENSE",
@@ -917,6 +774,15 @@ def main(screen, clock):  # Função principal do jogo
                 SCREEN_HEIGHT / 2 + 20,
                 center=True,
             )  # clicar para começar
+            draw_text(
+                "Pressione [ESC] para voltar ao Hub",
+                font_small,
+                WHITE,
+                screen,
+                SCREEN_WIDTH / 2,
+                SCREEN_HEIGHT / 2 + 60,
+                center=True,
+            )
 
         elif game_state == "PLAYING":  # após clicar espaco
             screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
@@ -929,9 +795,13 @@ def main(screen, clock):  # Função principal do jogo
             for enemy in enemy_group:
                 enemy.draw_health_bar(screen)
 
-            draw_tower_preview(screen, mouse_pos, selected_tower_type)  # desenha preview de construção onde o mouse está
+            if mouse_pos:  # Garante que mouse_pos não é None
+                draw_tower_preview(screen, mouse_pos, selected_tower_type)  # desenha preview de construção onde o mouse está
 
             draw_ui(screen, lives, money, wave, total_waves, buttons)  # desenha a tela e a parte inferior
+
+            if cheats_enabled:
+                draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, SCREEN_WIDTH - 100, 20, center=True)
 
         elif game_state == "GAME_OVER":  # estado derrota
             screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
@@ -994,16 +864,3 @@ def main(screen, clock):  # Função principal do jogo
             )
 
         pygame.display.flip()  # Update da tela
-
-    # pygame.quit()  # Encerra o Pygame (convenção encerrar as bibliotecas)
-    # sys.exit()  # Encerra o programa
-
-
-# =============================================================================
-# 5. INICIALIZAÇÃO DO PROGRAMA
-# =============================================================================
-
-# if (
-#     __name__ == "__main__"
-# ):  # Garante que o código só rode se o arquivo for executado diretamente
-#     main()

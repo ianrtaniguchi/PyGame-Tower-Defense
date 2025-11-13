@@ -8,7 +8,7 @@ from pygame.locals import *
 
 
 # Função principal que o hub vai chamar
-def main(screen, clock):
+def main(screen, clock, cheats_enabled):
 
     # Usa o relógio e a tela passados pelo hub
     relogio = clock
@@ -42,6 +42,10 @@ def main(screen, clock):
     VERMELHO = (255, 0, 0)
     AMARELO = (255, 255, 0)
     AZUL = (0, 0, 255)
+    VERDE = (0, 255, 0)
+
+    p1_altura_cheat = alt if cheats_enabled else raquete_alt
+    p1_velocidade_cheat = 0 if cheats_enabled else velocidade_raquete
 
     # Função de reset adaptada: ela retorna os novos valores
     def reset_bola(direcao):
@@ -65,8 +69,11 @@ def main(screen, clock):
                 if event.key == K_ESCAPE:  # Adiciona tecla ESC para sair
                     running = False
 
+        if cheats_enabled:
+            p1_y = 0
+
         # Desenhar raquetes
-        p1 = pygame.draw.rect(tela, VERMELHO, (p1_x, p1_y, raquete_larg, raquete_alt))
+        p1 = pygame.draw.rect(tela, VERMELHO, (p1_x, p1_y, raquete_larg, p1_altura_cheat))
         p2 = pygame.draw.rect(tela, AMARELO, (p2_x, p2_y, raquete_larg, raquete_alt))
 
         # Desenhar a bola
@@ -82,13 +89,13 @@ def main(screen, clock):
 
         # Verifica colisão com as raquetes
         bola_rect = pygame.Rect(b_x - 10, b_y - 10, 20, 20)
-        p1_rect = pygame.Rect(p1_x, p1_y, raquete_larg, raquete_alt)
+        p1_rect = pygame.Rect(p1_x, p1_y, raquete_larg, p1_altura_cheat)
         p2_rect = pygame.Rect(p2_x, p2_y, raquete_larg, raquete_alt)
 
         # Colisão com raquete esquerda
         if bola_rect.colliderect(p1_rect):
             bdx = abs(bdx)
-            offset = (b_y - (p1_y + raquete_alt / 2)) / (raquete_alt / 2)
+            offset = (b_y - (p1_y + p1_altura_cheat / 2)) / (p1_altura_cheat / 2)
             bdy = int(6 * offset)
             if bdy == 0:
                 bdy = 1  # Evita que a bola fique reta
@@ -112,9 +119,9 @@ def main(screen, clock):
         # Controles
         keys = pygame.key.get_pressed()
         if keys[pygame.K_w] and p1_y > 0:
-            p1_y -= velocidade_raquete
-        if keys[pygame.K_s] and p1_y + raquete_alt < alt:
-            p1_y += velocidade_raquete
+            p1_y -= p1_velocidade_cheat
+        if keys[pygame.K_s] and p1_y + p1_altura_cheat < alt:
+            p1_y += p1_velocidade_cheat
         if keys[pygame.K_UP] and p2_y > 0:
             p2_y -= velocidade_raquete
         if keys[pygame.K_DOWN] and p2_y + raquete_alt < alt:
@@ -125,6 +132,9 @@ def main(screen, clock):
         score_surf = font.render(score_text, True, BRANCO)
         score_rect = score_surf.get_rect(center=(larg // 2, 30))
         tela.blit(score_surf, score_rect)
+
+        if cheats_enabled:
+            draw_text("CHEATS ATIVADOS", font, VERDE, tela, 100, 30, center=True)
 
         # Atualiza a tela (apenas uma vez, no final)
         pygame.display.flip()

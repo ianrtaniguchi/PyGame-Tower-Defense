@@ -5,7 +5,7 @@ import sys
 import random
 
 
-def main(screen, clock):
+def main(screen, clock, cheats_enabled):
     WIDTH = screen.get_width()
     HEIGHT = screen.get_height()
 
@@ -89,10 +89,15 @@ def main(screen, clock):
         all_sprites.add(player)
 
         score = 0
-        lives = 3
+        lives = 999999999 if cheats_enabled else 3
         enemy_move_down = False
         enemy_shoot_timer = 0
         enemy_shoot_delay = 1000
+
+        player_shoot_timer = 0
+        player_shoot_delay = 500
+        if cheats_enabled:
+            player_shoot_delay = 1
 
         for row in range(5):
             for col in range(10):
@@ -105,6 +110,7 @@ def main(screen, clock):
         game_won = False
 
         while running:
+            now = pygame.time.get_ticks()
             for event in pygame.event.get():
                 if event.type == pygame.QUIT:
                     pygame.quit()
@@ -116,30 +122,21 @@ def main(screen, clock):
                         if event.key == pygame.K_SPACE:
                             game_loop()
                             return
-                    if event.key == pygame.K_SPACE and not game_over:
-                        player.shoot(all_sprites, projectiles)
+                    # Tiro removido daqui para ser baseado em tecla pressionada
+
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_SPACE] and not game_over:
+                if now - player_shoot_timer > player_shoot_delay:
+                    player.shoot(all_sprites, projectiles)
+                    player_shoot_timer = now
 
             if game_over or game_won:
                 screen.fill(BLACK)
                 message = "VOCÊ VENCEU!" if game_won else "GAME OVER"
                 color = GREEN if game_won else RED
                 draw_text(message, font_large, color, screen, WIDTH / 2, HEIGHT / 2 - 40)
-                draw_text(
-                    f"Pontuação: {score}",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 20,
-                )
-                draw_text(
-                    "Pressione [ESPAÇO] para reiniciar ou [ESC] para sair",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 60,
-                )
+                draw_text(f"Pontuação: {score}", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 20)
+                draw_text("Pressione [ESPAÇO] para reiniciar ou [ESC] para sair", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
                 pygame.display.flip()
                 clock.tick(60)
                 continue
@@ -157,7 +154,6 @@ def main(screen, clock):
                     e.rect.y += 10
                     e.speed *= -1
 
-            now = pygame.time.get_ticks()
             if now - enemy_shoot_timer > enemy_shoot_delay and enemies:
                 random.choice(enemies.sprites()).shoot(all_sprites, enemy_projectiles)
                 enemy_shoot_timer = now
@@ -166,15 +162,16 @@ def main(screen, clock):
             for hit in hits:
                 score += 10
 
-            hits = pygame.sprite.spritecollide(player, enemy_projectiles, True)
-            if hits:
-                lives -= 1
-                if lives <= 0:
-                    game_over = True
+            if not cheats_enabled:
+                hits = pygame.sprite.spritecollide(player, enemy_projectiles, True)
+                if hits:
+                    lives -= 1
+                    if lives <= 0:
+                        game_over = True
 
-            hits = pygame.sprite.spritecollide(player, enemies, False)
-            if hits:
-                game_over = True
+                hits = pygame.sprite.spritecollide(player, enemies, False)
+                if hits:
+                    game_over = True
 
             if not enemies:
                 game_won = True
@@ -183,15 +180,7 @@ def main(screen, clock):
             all_sprites.draw(screen)
 
             draw_text(f"Pontuação: {score}", font_small, WHITE, screen, 10, 10, center=False)
-            draw_text(
-                f"Vidas: {lives}",
-                font_small,
-                WHITE,
-                screen,
-                WIDTH - 100,
-                10,
-                center=False,
-            )
+            draw_text(f"Vidas: {lives}", font_small, WHITE, screen, WIDTH - 100, 10, center=False)
 
             pygame.display.flip()
             clock.tick(60)

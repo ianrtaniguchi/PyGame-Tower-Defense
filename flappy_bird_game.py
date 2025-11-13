@@ -3,7 +3,7 @@ import sys
 import random
 
 
-def main(screen, clock):
+def main(screen, clock, cheats_enabled):
     WIDTH = screen.get_width()
     HEIGHT = screen.get_height()
 
@@ -12,6 +12,7 @@ def main(screen, clock):
     BIRD_COLOR = (255, 255, 0)  # Amarelo
     PIPE_COLOR = (0, 200, 0)  # Verde
     BG_COLOR = (135, 206, 235)  # Fundo Azul
+    GREEN = (0, 255, 0)
 
     try:
         font_large = pygame.font.SysFont("Arial", 60)
@@ -118,39 +119,17 @@ def main(screen, clock):
 
             if not game_started:
                 screen.fill(BG_COLOR)
-                draw_text(
-                    "Pressione [ESPAÇO] para começar",
-                    font_small,
-                    BLACK,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2,
-                )
+                draw_text("Pressione [ESPAÇO] para começar", font_small, BLACK, screen, WIDTH / 2, HEIGHT / 2)
+                draw_text("Pressione [ESC] para voltar ao Hub", font_small, BLACK, screen, WIDTH / 2, HEIGHT / 2 + 40)
                 pygame.display.flip()
                 clock.tick(60)
                 continue
 
             if game_over:
                 screen.fill(BLACK)
-                draw_text(
-                    "GAME OVER", font_large, RED, screen, WIDTH / 2, HEIGHT / 2 - 40
-                )
-                draw_text(
-                    f"Pontuação: {score}",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 20,
-                )
-                draw_text(
-                    "Pressione [ESPAÇO] para reiniciar ou [ESC] para sair",
-                    font_small,
-                    WHITE,
-                    screen,
-                    WIDTH / 2,
-                    HEIGHT / 2 + 60,
-                )
+                draw_text("GAME OVER", font_large, RED, screen, WIDTH / 2, HEIGHT / 2 - 40)
+                draw_text(f"Pontuação: {score}", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 20)
+                draw_text("Pressione [ESPAÇO] para reiniciar ou [ESC] para sair", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
                 pygame.display.flip()
                 clock.tick(60)
                 continue
@@ -163,26 +142,20 @@ def main(screen, clock):
                 pipe_timer = now
 
             for pipe in pipes:
-                if (
-                    not pipe.rect.colliderect(bird.rect)
-                    and pipe.rect.right < bird.rect.left
-                    and pipe.rect.right > bird.rect.left - 6
-                ):
+                if not pipe.rect.colliderect(bird.rect) and pipe.rect.right < bird.rect.left and pipe.rect.right > bird.rect.left - 6:
                     if not hasattr(pipe, "scored"):
                         score += 0.5
                         pipe.scored = True
 
-            if (
-                pygame.sprite.spritecollide(bird, pipes, False)
-                or bird.rect.bottom > HEIGHT
-            ):
+            if not cheats_enabled and (pygame.sprite.spritecollide(bird, pipes, False) or bird.rect.bottom > HEIGHT):
                 game_over = True
 
             screen.fill(BG_COLOR)
             all_sprites.draw(screen)
-            draw_text(
-                f"Pontuação: {int(score)}", font_large, WHITE, screen, WIDTH // 2, 50
-            )
+            draw_text(f"Pontuação: {int(score)}", font_large, WHITE, screen, WIDTH // 2, 50)
+
+            if cheats_enabled:
+                draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, WIDTH - 100, 10, center=False)
 
             pygame.display.flip()
             clock.tick(60)

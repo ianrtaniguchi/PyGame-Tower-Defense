@@ -5,10 +5,12 @@
 # -pip install pygame pyrebase4
 
 import pygame
+
+pygame.init()
+pygame.mixer.init()
 import sys
 import pyrebase
-import os  # Importado para centralizar a janela
-
+import os
 import tower_defense_game
 import snake_game
 import ping_pong_game
@@ -19,9 +21,7 @@ import pacman_game
 
 # raycaster_game removido
 
-print(
-    "--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------"
-)
+print("--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------")
 
 # Adiciona a linha para centralizar a janela ANTES do init
 os.environ["SDL_VIDEO_WINDOW_POS"] = "center"
@@ -39,14 +39,10 @@ except Exception as e:
     print(f"ERRO CRITICO: Falha ao inicializar o Firebase: {e}")
     auth = None
 
-pygame.init()
-pygame.mixer.init()
 
-# Lógica de Scaling REMOVIDA
-# Define o tamanho final da tela
+# Define um tamanho de tela único. Sem scaling.
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-# virtual_screen e display_surface REMOVIDOS
 
 pygame.display.set_caption("Hub de Jogos")
 clock = pygame.time.Clock()
@@ -60,6 +56,7 @@ SECONDARY_HOVER = (90, 90, 110)
 INPUT_BG = (50, 50, 60)
 FOCUS_COLOR = (50, 150, 255)
 ERROR_COLOR = (200, 50, 50)
+SUCCESS_COLOR = (0, 200, 0)
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 
@@ -103,9 +100,8 @@ class Button:
         text_rect = text_surf.get_rect(center=self.rect.center)
         surface.blit(text_surf, text_rect)
 
-    # handle_event simplificado para não receber 'mouse_pos'
     def handle_event(self, event):
-        mouse_pos = pygame.mouse.get_pos()  # Pega o mouse_pos aqui
+        mouse_pos = pygame.mouse.get_pos()
         if event.type == pygame.MOUSEMOTION:
             self.is_hovered = self.rect.collidepoint(mouse_pos)
 
@@ -129,43 +125,41 @@ def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     surface.blit(text_obj, text_rect)
 
 
-# Função get_scaled_mouse_pos REMOVIDA
+cheats_enabled = False
+KONAMI_CODE = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_b, pygame.K_a]
+key_sequence = []
 
 
-# Funções 'run' simplificadas para passar 'screen' e não 'virtual_screen'
 def run_tower_defense():
-    tower_defense_game.main(screen, clock)  # Não passa mais 'scales'
+    tower_defense_game.main(screen, clock, cheats_enabled)
 
 
 def run_snake():
-    snake_game.main(screen, clock)
+    snake_game.main(screen, clock, cheats_enabled)
 
 
 def run_ping_pong():
-    ping_pong_game.main(screen, clock)
+    ping_pong_game.main(screen, clock, cheats_enabled)
 
 
 def run_tic_tac_toe():
-    tic_tac_toe_game.main(screen, clock)  # Não passa mais 'scales'
+    tic_tac_toe_game.main(screen, clock, cheats_enabled)
 
 
 def run_space_invaders():
-    space_invaders_game.main(screen, clock)
+    space_invaders_game.main(screen, clock, cheats_enabled)
 
 
 def run_flappy_bird():
-    flappy_bird_game.main(screen, clock)
+    flappy_bird_game.main(screen, clock, cheats_enabled)
 
 
 def run_pacman():
-    pacman_game.main(screen, clock)
-
-
-# run_raycaster REMOVIDA
+    pacman_game.main(screen, clock, cheats_enabled)
 
 
 def main():
-    global auth
+    global auth, cheats_enabled, key_sequence
     game_state = "LOGIN"
 
     if auth is None:
@@ -175,22 +169,19 @@ def main():
     password_input = ""
     active_field = None
     login_message = ""
+    message_color = ERROR_COLOR
 
     input_width = 400
     input_height = 50
     button_width = 190
     button_height = 50
-    center_x = SCREEN_WIDTH // 2  # Usa SCREEN_WIDTH
+    center_x = SCREEN_WIDTH // 2
 
-    email_rect = pygame.Rect(
-        center_x - (input_width // 2), 250, input_width, input_height
-    )
-    password_rect = pygame.Rect(
-        center_x - (input_width // 2), 330, input_width, input_height
-    )
+    email_rect = pygame.Rect(center_x - (input_width // 2), 250, input_width, input_height)
+    password_rect = pygame.Rect(center_x - (input_width // 2), 330, input_width, input_height)
 
     def do_login():
-        nonlocal login_message, game_state, email_input, password_input, active_field
+        nonlocal login_message, game_state, email_input, password_input, active_field, message_color
         try:
             user = auth.sign_in_with_email_and_password(email_input, password_input)
             game_state = "MENU"
@@ -199,13 +190,16 @@ def main():
             active_field = None
         except Exception as e:
             login_message = "Email ou senha inválidos."
+            message_color = ERROR_COLOR
 
     def do_register():
-        nonlocal login_message
+        nonlocal login_message, message_color
         try:
             user = auth.create_user_with_email_and_password(email_input, password_input)
             login_message = "Registrado! Faça o login."
+            message_color = SUCCESS_COLOR
         except Exception as e:
+            message_color = ERROR_COLOR
             try:
                 error_info = e.args[1]
                 if "EMAIL_EXISTS" in error_info:
@@ -297,32 +291,37 @@ def main():
             PRIMARY_COLOR,
             PRIMARY_HOVER,
         ),
-        # Botão "Raycaster 3D" removido
     ]
 
     running = True
     while running:
-        # virtual_mouse_pos REMOVIDO
-
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
-            # scaled_event REMOVIDO. Passa 'event' normal
             if game_state == "LOGIN":
                 for btn in login_buttons:
-                    btn.handle_event(event)  # Passa 'event'
+                    btn.handle_event(event)
 
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     login_message = ""
-                    if email_rect.collidepoint(event.pos):  # Usa 'event.pos'
+                    if email_rect.collidepoint(event.pos):
                         active_field = "email"
-                    elif password_rect.collidepoint(event.pos):  # Usa 'event.pos'
+                    elif password_rect.collidepoint(event.pos):
                         active_field = "password"
                     else:
                         active_field = None
 
                 if event.type == pygame.KEYDOWN:
+                    # --- LÓGICA DE CHEAT ---
+                    key_sequence.append(event.key)
+                    key_sequence = key_sequence[-len(KONAMI_CODE) :]
+                    if key_sequence == KONAMI_CODE:
+                        cheats_enabled = not cheats_enabled  # Alterna o cheat
+                        login_message = "CHEATS ATIVADOS!" if cheats_enabled else "CHEATS DESATIVADOS"
+                        message_color = SUCCESS_COLOR if cheats_enabled else ERROR_COLOR
+                    # --- FIM DA LÓGICA DE CHEAT ---
+
                     if event.key == pygame.K_RETURN:
                         if active_field == "email":
                             active_field = "password"
@@ -342,17 +341,25 @@ def main():
 
             elif game_state == "MENU":
                 for button in game_buttons:
-                    button.handle_event(event)  # Passa 'event'
+                    button.handle_event(event)
 
-        screen.fill(BG_COLOR)  # Desenha na 'screen'
+                if event.type == pygame.KEYDOWN:
+                    # --- LÓGICA DE CHEAT (também no menu) ---
+                    key_sequence.append(event.key)
+                    key_sequence = key_sequence[-len(KONAMI_CODE) :]
+                    if key_sequence == KONAMI_CODE:
+                        cheats_enabled = not cheats_enabled
+                    # --- FIM DA LÓGICA DE CHEAT ---
+
+        screen.fill(BG_COLOR)
 
         if game_state == "LOGIN":
             draw_text(
                 "HUB DE JOGOS - LOGIN",
                 font_large,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
-                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
+                screen,
+                SCREEN_WIDTH / 2,
                 150,
                 center=True,
             )
@@ -361,7 +368,7 @@ def main():
                 "Email:",
                 font_small,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
+                screen,
                 email_rect.left,
                 email_rect.top - 28,
                 center=False,
@@ -373,7 +380,7 @@ def main():
                 email_input,
                 font_small,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
+                screen,
                 email_rect.left + 15,
                 email_rect.centery,
                 v_center=True,
@@ -383,37 +390,33 @@ def main():
                 "Senha:",
                 font_small,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
+                screen,
                 password_rect.left,
                 password_rect.top - 28,
                 center=False,
             )
-            border_color_pass = (
-                FOCUS_COLOR if active_field == "password" else TEXT_COLOR
-            )
+            border_color_pass = FOCUS_COLOR if active_field == "password" else TEXT_COLOR
             pygame.draw.rect(screen, INPUT_BG, password_rect, border_radius=8)
-            pygame.draw.rect(
-                screen, border_color_pass, password_rect, 2, border_radius=8
-            )
+            pygame.draw.rect(screen, border_color_pass, password_rect, 2, border_radius=8)
             draw_text(
                 "*" * len(password_input),
                 font_small,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
+                screen,
                 password_rect.left + 15,
                 password_rect.centery,
                 v_center=True,
             )
 
             for btn in login_buttons:
-                btn.draw(screen)  # Usa 'screen'
+                btn.draw(screen)
 
             draw_text(
                 login_message,
                 font_small,
-                ERROR_COLOR,
-                screen,  # Usa 'screen'
-                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
+                message_color,  # Usa a cor da mensagem (erro ou sucesso)
+                screen,
+                SCREEN_WIDTH / 2,
                 480,
                 center=True,
             )
@@ -423,15 +426,18 @@ def main():
                 "HUB DE JOGOS",
                 font_large,
                 TEXT_COLOR,
-                screen,  # Usa 'screen'
-                SCREEN_WIDTH / 2,  # Usa SCREEN_WIDTH
+                screen,
+                SCREEN_WIDTH / 2,
                 100,
                 center=True,
             )
             for button in game_buttons:
-                button.draw(screen)  # Usa 'screen'
+                button.draw(screen)
 
-        # Bloco de 'scaled_surface' REMOVIDO
+            # --- Indicador de Cheat ---
+            if cheats_enabled:
+                draw_text("CHEATS ATIVADOS", font_small, SUCCESS_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, center=True)
+            # --- Fim do Indicador ---
 
         pygame.display.flip()
         clock.tick(60)
