@@ -19,26 +19,25 @@ import space_invaders_game
 import flappy_bird_game
 import pacman_game
 
-# raycaster_game removido
-
 print("--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------")
 
-# Adiciona a linha para centralizar a janela ANTES do init
+# Adiciona a linha para centralizar a janela
 os.environ["SDL_VIDEO_WINDOW_POS"] = "center"
 
 firebaseConfig = {
     "apiKey": "AIzaSyB6p7OSeA19GyE1lypGTfWe-_Otbt2b0f8",
     "authDomain": "mechanical-tower-defense.firebaseapp.com",
-    "databaseURL": "https" + "://mechanical-tower-defense.firebaseio.com",
+    "databaseURL": "https://mechanical-tower-defense-default-rtdb.firebaseio.com/",
     "storageBucket": "mechanical-tower-defense.appspot.com",
 }
 try:
     firebase = pyrebase.initialize_app(firebaseConfig)
     auth = firebase.auth()
+    db = firebase.database()
 except Exception as e:
     print(f"ERRO CRITICO: Falha ao inicializar o Firebase: {e}")
     auth = None
-
+    db = None
 
 # Define um tamanho de tela único. Sem scaling.
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
@@ -129,13 +128,85 @@ cheats_enabled = False
 KONAMI_CODE = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_b, pygame.K_a]
 key_sequence = []
 
+user_info = {}
+
+
+def submit_score(game_name, score):
+    if not db or not user_info:
+        print("Erro")
+        return
+
+    try:
+        user_id = user_info["localId"]
+        user_name = user_info["email"].split("@")[0]
+
+        # Caminho para a pontuação deste utilizador neste jogo
+        score_path = db.child("scores").child(game_name).child(user_id)
+
+        existing_score = score_path.child("score").get()
+        if existing_score.val() is None or score > existing_score.val():
+            data = {"name": user_name, "score": score}
+            score_path.set(data)
+            print(f"Novo recorde pessoal para {game_name} submetido: {score}")
+    except Exception as e:
+        print(f"Erro ao submeter pontuação: {e}")
+
+
+def show_scoreboard(game_name, game_title):
+    scores = []
+    try:
+        scores_raw = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get()
+        if scores_raw.val():
+            scores = sorted(scores_raw.val().items(), key=lambda item: item[1]["score"], reverse=True)
+    except Exception as e:
+        print(f"Erro ao buscar scores: {e}")
+
+    back_button = Button("Voltar", (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 80, 200, 50), lambda: None, font_small, SECONDARY_COLOR, SECONDARY_HOVER)
+
+    running = True
+    while running:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+            if back_button.handle_event(event):
+                running = False
+
+        screen.fill(BG_COLOR)
+        draw_text(f"Scoreboard - {game_title}", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 50, center=True)
+
+        if not scores:
+            draw_text("Nenhuma pontuação encontrada.", font_medium, TEXT_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, center=True)
+        else:
+            y_pos = 150
+            for i, (user_id, data) in enumerate(scores):
+                rank = f"{i + 1}."
+                name = data.get("name", "???")
+                score = data.get("score", 0)
+
+                draw_text(rank, font_medium, TEXT_COLOR, screen, 300, y_pos, center=False)
+                draw_text(name, font_medium, TEXT_COLOR, screen, 400, y_pos, center=False)
+                draw_text(str(score), font_medium, TEXT_COLOR, screen, 800, y_pos, center=False)
+                y_pos += 40
+
+        back_button.draw(screen)
+        pygame.display.flip()
+        clock.tick(60)
+
 
 def run_tower_defense():
-    tower_defense_game.main(screen, clock, cheats_enabled)
+    score = tower_defense_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("tower_defense_game", score)
 
 
 def run_snake():
-    snake_game.main(screen, clock, cheats_enabled)
+    score = snake_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("snake_game", score)
 
 
 def run_ping_pong():
@@ -147,19 +218,25 @@ def run_tic_tac_toe():
 
 
 def run_space_invaders():
-    space_invaders_game.main(screen, clock, cheats_enabled)
+    score = space_invaders_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("space_invaders_game", score)
 
 
 def run_flappy_bird():
-    flappy_bird_game.main(screen, clock, cheats_enabled)
+    score = flappy_bird_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("flappy_bird_game", score)
 
 
 def run_pacman():
-    pacman_game.main(screen, clock, cheats_enabled)
+    score = pacman_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("pacman_game", score)
 
 
 def main():
-    global auth, cheats_enabled, key_sequence
+    global auth, cheats_enabled, key_sequence, user_info, db
     game_state = "LOGIN"
 
     if auth is None:
@@ -184,6 +261,8 @@ def main():
         nonlocal login_message, game_state, email_input, password_input, active_field, message_color
         try:
             user = auth.sign_in_with_email_and_password(email_input, password_input)
+            user_info["localId"] = user["localId"]
+            user_info["email"] = user["email"]
             game_state = "MENU"
             email_input = ""
             password_input = ""
@@ -231,66 +310,41 @@ def main():
 
     login_buttons = [login_button, register_button]
 
+    # --- INÍCIO DA CORREÇÃO ---
+    # Funções auxiliares para mudar o game_state, pois lambdas
+    # não podem conter a declaração 'nonlocal'.
+    def go_to_score_menu():
+        nonlocal game_state
+        game_state = "SCORE_MENU"
+
+    def go_to_main_menu():
+        nonlocal game_state
+        game_state = "MENU"
+
+    # --- FIM DA CORREÇÃO ---
+
     btn_w, btn_h = 280, 70
     col1, col2, col3, col4 = 100, 400, 700, 980
 
     game_buttons = [
-        Button(
-            "Tower Defense",
-            (col1, 200, btn_w, btn_h),
-            run_tower_defense,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Snake",
-            (col2, 200, btn_w, btn_h),
-            run_snake,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Ping Pong",
-            (col3, 200, btn_w, btn_h),
-            run_ping_pong,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Jogo da Velha",
-            (col4, 200, btn_w, btn_h),
-            run_tic_tac_toe,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Space Invaders",
-            (col1, 300, btn_w, btn_h),
-            run_space_invaders,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Flappy Bird",
-            (col2, 300, btn_w, btn_h),
-            run_flappy_bird,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
-        Button(
-            "Pac-Man",
-            (col3, 300, btn_w, btn_h),
-            run_pacman,
-            font_small,
-            PRIMARY_COLOR,
-            PRIMARY_HOVER,
-        ),
+        Button("Tower Defense", (col1, 200, btn_w, btn_h), run_tower_defense, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Snake", (col2, 200, btn_w, btn_h), run_snake, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Ping Pong", (col3, 200, btn_w, btn_h), run_ping_pong, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Jogo da Velha", (col4, 200, btn_w, btn_h), run_tic_tac_toe, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Space Invaders", (col1, 300, btn_w, btn_h), run_space_invaders, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Flappy Bird", (col2, 300, btn_w, btn_h), run_flappy_bird, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Pac-Man", (col3, 300, btn_w, btn_h), run_pacman, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # --- NOVO: Botão Scoreboard (CORRIGIDO) ---
+        Button("Scoreboard", (col4, 300, btn_w, btn_h), go_to_score_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
+    ]
+
+    score_menu_buttons = [
+        Button("Snake", (col1, 200, btn_w, btn_h), lambda: show_scoreboard("snake_game", "Snake"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Tower Defense", (col2, 200, btn_w, btn_h), lambda: show_scoreboard("tower_defense_game", "Tower Defense"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Space Invaders", (col3, 200, btn_w, btn_h), lambda: show_scoreboard("space_invaders_game", "Space Invaders"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Flappy Bird", (col1, 300, btn_w, btn_h), lambda: show_scoreboard("flappy_bird_game", "Flappy Bird"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Pac-Man", (col2, 300, btn_w, btn_h), lambda: show_scoreboard("pacman_game", "Pac-Man"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Voltar", (col4, 400, btn_w, btn_h), go_to_main_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),  # <-- CORRIGIDO AQUI
     ]
 
     running = True
@@ -302,7 +356,6 @@ def main():
             if game_state == "LOGIN":
                 for btn in login_buttons:
                     btn.handle_event(event)
-
                 if event.type == pygame.MOUSEBUTTONDOWN:
                     login_message = ""
                     if email_rect.collidepoint(event.pos):
@@ -311,16 +364,13 @@ def main():
                         active_field = "password"
                     else:
                         active_field = None
-
                 if event.type == pygame.KEYDOWN:
-                    # --- LÓGICA DE CHEAT ---
                     key_sequence.append(event.key)
                     key_sequence = key_sequence[-len(KONAMI_CODE) :]
                     if key_sequence == KONAMI_CODE:
-                        cheats_enabled = not cheats_enabled  # Alterna o cheat
+                        cheats_enabled = not cheats_enabled
                         login_message = "CHEATS ATIVADOS!" if cheats_enabled else "CHEATS DESATIVADOS"
                         message_color = SUCCESS_COLOR if cheats_enabled else ERROR_COLOR
-                    # --- FIM DA LÓGICA DE CHEAT ---
 
                     if event.key == pygame.K_RETURN:
                         if active_field == "email":
@@ -342,102 +392,45 @@ def main():
             elif game_state == "MENU":
                 for button in game_buttons:
                     button.handle_event(event)
-
                 if event.type == pygame.KEYDOWN:
-                    # --- LÓGICA DE CHEAT (também no menu) ---
                     key_sequence.append(event.key)
                     key_sequence = key_sequence[-len(KONAMI_CODE) :]
                     if key_sequence == KONAMI_CODE:
                         cheats_enabled = not cheats_enabled
-                    # --- FIM DA LÓGICA DE CHEAT ---
+
+            elif game_state == "SCORE_MENU":
+                for button in score_menu_buttons:
+                    button.handle_event(event)
 
         screen.fill(BG_COLOR)
 
         if game_state == "LOGIN":
-            draw_text(
-                "HUB DE JOGOS - LOGIN",
-                font_large,
-                TEXT_COLOR,
-                screen,
-                SCREEN_WIDTH / 2,
-                150,
-                center=True,
-            )
-
-            draw_text(
-                "Email:",
-                font_small,
-                TEXT_COLOR,
-                screen,
-                email_rect.left,
-                email_rect.top - 28,
-                center=False,
-            )
+            draw_text("HUB DE JOGOS - LOGIN", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 150, center=True)
+            draw_text("Email:", font_small, TEXT_COLOR, screen, email_rect.left, email_rect.top - 28, center=False)
             border_color_email = FOCUS_COLOR if active_field == "email" else TEXT_COLOR
             pygame.draw.rect(screen, INPUT_BG, email_rect, border_radius=8)
             pygame.draw.rect(screen, border_color_email, email_rect, 2, border_radius=8)
-            draw_text(
-                email_input,
-                font_small,
-                TEXT_COLOR,
-                screen,
-                email_rect.left + 15,
-                email_rect.centery,
-                v_center=True,
-            )
-
-            draw_text(
-                "Senha:",
-                font_small,
-                TEXT_COLOR,
-                screen,
-                password_rect.left,
-                password_rect.top - 28,
-                center=False,
-            )
+            draw_text(email_input, font_small, TEXT_COLOR, screen, email_rect.left + 15, email_rect.centery, v_center=True)
+            draw_text("Senha:", font_small, TEXT_COLOR, screen, password_rect.left, password_rect.top - 28, center=False)
             border_color_pass = FOCUS_COLOR if active_field == "password" else TEXT_COLOR
             pygame.draw.rect(screen, INPUT_BG, password_rect, border_radius=8)
             pygame.draw.rect(screen, border_color_pass, password_rect, 2, border_radius=8)
-            draw_text(
-                "*" * len(password_input),
-                font_small,
-                TEXT_COLOR,
-                screen,
-                password_rect.left + 15,
-                password_rect.centery,
-                v_center=True,
-            )
-
+            draw_text("*" * len(password_input), font_small, TEXT_COLOR, screen, password_rect.left + 15, password_rect.centery, v_center=True)
             for btn in login_buttons:
                 btn.draw(screen)
-
-            draw_text(
-                login_message,
-                font_small,
-                message_color,  # Usa a cor da mensagem (erro ou sucesso)
-                screen,
-                SCREEN_WIDTH / 2,
-                480,
-                center=True,
-            )
+            draw_text(login_message, font_small, message_color, screen, SCREEN_WIDTH / 2, 480, center=True)
 
         elif game_state == "MENU":
-            draw_text(
-                "HUB DE JOGOS",
-                font_large,
-                TEXT_COLOR,
-                screen,
-                SCREEN_WIDTH / 2,
-                100,
-                center=True,
-            )
+            draw_text("HUB DE JOGOS", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 100, center=True)
             for button in game_buttons:
                 button.draw(screen)
-
-            # --- Indicador de Cheat ---
             if cheats_enabled:
                 draw_text("CHEATS ATIVADOS", font_small, SUCCESS_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, center=True)
-            # --- Fim do Indicador ---
+
+        elif game_state == "SCORE_MENU":
+            draw_text("SCOREBOARDS", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 100, center=True)
+            for button in score_menu_buttons:
+                button.draw(screen)
 
         pygame.display.flip()
         clock.tick(60)

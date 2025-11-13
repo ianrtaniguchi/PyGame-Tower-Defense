@@ -59,7 +59,7 @@ def main(screen, clock, cheats_enabled):
                     if event.type == pygame.KEYDOWN:
                         if event.key == pygame.K_SPACE:
                             game_loop()
-                            return
+                            return score
                         if event.key == pygame.K_ESCAPE:
                             running = False
             else:
