@@ -18,6 +18,11 @@ import tic_tac_toe_game
 import space_invaders_game
 import flappy_bird_game
 import pacman_game
+import cookie_clicker_game
+import memory_game
+import doisK_game
+import quiz_game
+import evade_game
 
 print("--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------")
 
@@ -133,7 +138,7 @@ user_info = {}
 
 def submit_score(game_name, score):
     if not db or not user_info:
-        print("Erro")
+        print("Erro de autenticação ou banco de dados não disponível. Ou usuário não logado.")
         return
 
     try:
@@ -235,6 +240,36 @@ def run_pacman():
         submit_score("pacman_game", score)
 
 
+def run_cookie_clicker():
+    score = cookie_clicker_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("cookie_clicker_game", score)
+
+
+def run_memory_game():
+    score = memory_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("memory_game", score)
+
+
+def run_doisK_game():
+    score = doisK_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("doisK_game", score)
+
+
+def run_quiz_game():
+    score = quiz_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("quiz_game", score)
+
+
+def run_evade_game():
+    score = evade_game.main(screen, clock, cheats_enabled)
+    if score is not None:
+        submit_score("evade_game", score)
+
+
 def main():
     global auth, cheats_enabled, key_sequence, user_info, db
     game_state = "LOGIN"
@@ -310,9 +345,6 @@ def main():
 
     login_buttons = [login_button, register_button]
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Funções auxiliares para mudar o game_state, pois lambdas
-    # não podem conter a declaração 'nonlocal'.
     def go_to_score_menu():
         nonlocal game_state
         game_state = "SCORE_MENU"
@@ -321,30 +353,45 @@ def main():
         nonlocal game_state
         game_state = "MENU"
 
-    # --- FIM DA CORREÇÃO ---
-
     btn_w, btn_h = 280, 70
     col1, col2, col3, col4 = 100, 400, 700, 980
 
     game_buttons = [
+        # Linha 1
         Button("Tower Defense", (col1, 200, btn_w, btn_h), run_tower_defense, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Snake", (col2, 200, btn_w, btn_h), run_snake, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Ping Pong", (col3, 200, btn_w, btn_h), run_ping_pong, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Jogo da Velha", (col4, 200, btn_w, btn_h), run_tic_tac_toe, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 2
         Button("Space Invaders", (col1, 300, btn_w, btn_h), run_space_invaders, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Flappy Bird", (col2, 300, btn_w, btn_h), run_flappy_bird, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Pac-Man", (col3, 300, btn_w, btn_h), run_pacman, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # --- NOVO: Botão Scoreboard (CORRIGIDO) ---
-        Button("Scoreboard", (col4, 300, btn_w, btn_h), go_to_score_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
+        Button("Cookie Clicker", (col4, 300, btn_w, btn_h), run_cookie_clicker, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 3
+        Button("Jogo da Memória", (col1, 400, btn_w, btn_h), run_memory_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("2048", (col2, 400, btn_w, btn_h), run_doisK_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Quiz", (col3, 400, btn_w, btn_h), run_quiz_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Evade (Queda Livre)", (col4, 400, btn_w, btn_h), run_evade_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 4
+        Button("Scoreboard", (col4, 500, btn_w, btn_h), go_to_score_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
     ]
 
     score_menu_buttons = [
+        # Linha 1
         Button("Snake", (col1, 200, btn_w, btn_h), lambda: show_scoreboard("snake_game", "Snake"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Tower Defense", (col2, 200, btn_w, btn_h), lambda: show_scoreboard("tower_defense_game", "Tower Defense"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
         Button("Space Invaders", (col3, 200, btn_w, btn_h), lambda: show_scoreboard("space_invaders_game", "Space Invaders"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Flappy Bird", (col1, 300, btn_w, btn_h), lambda: show_scoreboard("flappy_bird_game", "Flappy Bird"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Pac-Man", (col2, 300, btn_w, btn_h), lambda: show_scoreboard("pacman_game", "Pac-Man"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Voltar", (col4, 400, btn_w, btn_h), go_to_main_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),  # <-- CORRIGIDO AQUI
+        Button("Flappy Bird", (col4, 200, btn_w, btn_h), lambda: show_scoreboard("flappy_bird_game", "Flappy Bird"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 2
+        Button("Pac-Man", (col1, 300, btn_w, btn_h), lambda: show_scoreboard("pacman_game", "Pac-Man"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Cookie Clicker", (col2, 300, btn_w, btn_h), lambda: show_scoreboard("cookie_clicker_game", "Cookie Clicker"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Jogo da Memória", (col3, 300, btn_w, btn_h), lambda: show_scoreboard("memory_game", "Jogo da Memória"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("2048", (col4, 300, btn_w, btn_h), lambda: show_scoreboard("2048_game", "2048"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 3
+        Button("Quiz", (col1, 400, btn_w, btn_h), lambda: show_scoreboard("quiz_game", "Quiz"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        Button("Evade (Queda Livre)", (col2, 400, btn_w, btn_h), lambda: show_scoreboard("evade_game", "Evade"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
+        # Linha 4
+        Button("Voltar", (col4, 500, btn_w, btn_h), go_to_main_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
     ]
 
     running = True
