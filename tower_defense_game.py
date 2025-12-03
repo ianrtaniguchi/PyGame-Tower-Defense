@@ -94,14 +94,16 @@ def create_placeholder_surface(width, height, color):  # Cria uma superfície de
     return surface
 
 
-def load_image(filename, placeholder_size, placeholder_color, colorkey=None):
+def load_image(filename, placeholder_size, placeholder_color, colorkey=None, scale=None):
     try:
         path = IMAGES_DIR / filename
         if not path.exists():
-            # Tenta procurar sem o subdiretório se falhar
             path = IMAGES_DIR / Path(filename).name
 
-        img = pygame.image.load(path)
+        img = pygame.image.load(str(path))
+
+        if scale:
+            img = pygame.transform.scale(img, scale)
 
         if colorkey is not None:
             img = img.convert()
@@ -111,8 +113,8 @@ def load_image(filename, placeholder_size, placeholder_color, colorkey=None):
 
         return img
     except (pygame.error, FileNotFoundError):
-        print(f"AVISO: Imagem '{filename}' não encontrada ou com erro. Usando placeholder.")
-        return create_placeholder_surface(*placeholder_size, placeholder_color)
+        print(f"AVISO: Imagem '{filename}' não encontrada. Usando placeholder.")
+        return create_placeholder_surface(placeholder_size[0], placeholder_size[1], placeholder_color)
 
 
 def load_sound(filename, volume=0.20):  # Tenta carregar um som, se falhar, retorna um objeto vazio do tipo 'none'
@@ -136,15 +138,31 @@ except pygame.error as e:
     print("O 'map.png' é essencial. Criando um fundo preto por padrão.")
     background_image = create_placeholder_surface(SCREEN_WIDTH, GAME_HEIGHT, BLACK)
 
-monster_walk_imgs = []
-for i in range(1, 9):
-    img = load_image(f"Eye-Monster/walk/monster-{i}.jpg", (32, 32), BLUE, colorkey=WHITE)
-    monster_walk_imgs.append(img)
+# --- Carregamento de Assets dos Inimigos ---
 
-monster_death_imgs = []
+# 1. Eye Monster (Tanque) -> Arquivos .jpg
+eye_walk_imgs = []
+for i in range(1, 9):
+    # Nota: Eye Monster usa .jpg nos arquivos que você enviou
+    img = load_image(f"Eye-Monster/walk/monster-{i}.jpg", (40, 40), BLUE, scale=(50, 50))
+    eye_walk_imgs.append(img)
+
+eye_death_imgs = []
 for i in range(1, 5):
-    img = load_image(f"Eye-Monster/death/death-{i}.jpg", (32, 32), RED, colorkey=WHITE)
-    monster_death_imgs.append(img)
+    img = load_image(f"Eye-Monster/death/death-{i}.jpg", (40, 40), RED, scale=(50, 50))
+    eye_death_imgs.append(img)
+
+# 2. Skeleton (Soldier) -> Arquivos .png
+# IMPORTANTE: Crie uma pasta chamada "Skeleton" dentro de assets/images e coloque os arquivos lá
+skelly_walk_imgs = []
+for i in range(1, 4):
+    img = load_image(f"Skeleton/base.skelly.side ({i}).png", (32, 32), GREY, scale=(40, 40))
+    skelly_walk_imgs.append(img)
+
+skelly_death_imgs = []
+for i in range(1, 9):
+    img = load_image(f"Skeleton/base.skelly.death ({i}).png", (32, 32), RED, scale=(40, 40))
+    skelly_death_imgs.append(img)
 
 
 tank_sprite = load_image("tank.png", (40, 40), GREY)  #
@@ -247,54 +265,72 @@ class Enemy(pygame.sprite.Sprite):
         self.pos = pygame.math.Vector2(self.path[0])
         self.enemy_type = enemy_type
 
-        # Variáveis de Animação
-        self.state = "walking"  # Estados: walking, dying
+        self.flip = False
+        self.state = "walking"
         self.frame_index = 0
         self.animation_speed = 0.15
 
+        # --- CORREÇÃO: TUDO ISSO AGORA ESTÁ DENTRO DO __INIT__ (COM TAB) ---
         if enemy_type == "soldier":
-            # Usa as listas carregadas anteriormente
-            self.sprites_walk = monster_walk_imgs if monster_walk_imgs else [create_placeholder_surface(32, 32, BLUE)]
-            self.sprites_death = monster_death_imgs if monster_death_imgs else [create_placeholder_surface(32, 32, RED)]
-            self.speed = 2
-            self.max_health = 100
-            self.reward = 10
-            self.image = self.sprites_walk[0]
+            # Soldier usa o ESQUELETO
+            self.sprites_walk = skelly_walk_imgs if skelly_walk_imgs else [create_placeholder_surface(32, 32, GREY)]
+            self.sprites_death = skelly_death_imgs if skelly_death_imgs else [create_placeholder_surface(32, 32, RED)]
+            self.speed = 3
+            self.max_health = 80
+            self.reward = 15
+            self.animation_speed = 0.15
+            self.image = self.sprites_walk[0]  # Define imagem inicial
 
         elif enemy_type == "tank":
-            # Tank continua sem animação por enquanto
-            self.sprites_walk = [tank_sprite]
-            self.sprites_death = [tank_sprite]
-            self.speed = 1
+            # Tank usa o EYE MONSTER
+            self.sprites_walk = eye_walk_imgs if eye_walk_imgs else [create_placeholder_surface(40, 40, BLUE)]
+            self.sprites_death = eye_death_imgs if eye_death_imgs else [create_placeholder_surface(40, 40, RED)]
+            self.speed = 1.5
             self.max_health = 300
-            self.reward = 25
-            self.image = self.sprites_walk[0]
+            self.reward = 30
+            self.animation_speed = 0.2
+            self.image = self.sprites_walk[0]  # Define imagem inicial
 
-        self.health = self.max_health
+        else:
+            # Fallback de segurança (Evita o crash se o tipo for desconhecido)
+            self.sprites_walk = [create_placeholder_surface(32, 32, WHITE)]
+            self.sprites_death = [create_placeholder_surface(32, 32, WHITE)]
+            self.speed = 1
+            self.max_health = 10
+            self.reward = 1
+            self.image = self.sprites_walk[0]  # Define imagem inicial
+        # -------------------------------------------------------------------
+
+        # Cria o retângulo (Hitbox) baseado na imagem definida acima
         self.rect = self.image.get_rect(center=self.pos)
+        self.health = self.max_health
 
     def update(self):
-        # Se estiver morrendo, toca animação de morte
         if self.state == "dying":
             self.animate_death()
         else:
-            # Se vivo, move e anima caminhada
             self.move()
             self.animate_walk()
 
     def move(self):
-        target_waypoint = self.path[self.waypoint_index]
-        target_vector = pygame.math.Vector2(target_waypoint)
-
+        target_vector = pygame.math.Vector2(self.path[self.waypoint_index])
         try:
-            direction = (target_vector - self.pos).normalize()
+            diff = target_vector - self.pos
+            direction = diff.normalize()
+
+            # Verifica direção para virar o sprite (flip)
+            if direction.x < 0:
+                self.flip = True  # Vira para esquerda
+            elif direction.x > 0:
+                self.flip = False  # Normal (direita)
+
         except ValueError:
             direction = pygame.math.Vector2(0, 0)
 
         self.pos += direction * self.speed
         self.rect.center = self.pos
 
-        if (target_vector - self.pos).length_squared() < self.speed**2:
+        if (target_vector - self.pos).length_squared() < (self.speed * 1.5) ** 2:
             self.waypoint_index += 1
             if self.waypoint_index >= len(self.path):
                 pygame.event.post(pygame.event.Event(pygame.USEREVENT, {"tipo": "enemy_leaked"}))
@@ -304,21 +340,29 @@ class Enemy(pygame.sprite.Sprite):
         self.frame_index += self.animation_speed
         if self.frame_index >= len(self.sprites_walk):
             self.frame_index = 0
-        self.image = self.sprites_walk[int(self.frame_index)]
+
+        current_img = self.sprites_walk[int(self.frame_index)]
+
+        if self.flip:
+            current_img = pygame.transform.flip(current_img, True, False)
+
+        self.image = current_img
         self.rect = self.image.get_rect(center=self.pos)
 
     def animate_death(self):
         self.frame_index += self.animation_speed
         if self.frame_index >= len(self.sprites_death):
-            self.kill()  # Remove do jogo apenas quando a animação acaba
+            self.kill()
         else:
-            self.image = self.sprites_death[int(self.frame_index)]
+            current_img = self.sprites_death[int(self.frame_index)]
+            if self.flip:
+                current_img = pygame.transform.flip(current_img, True, False)
+            self.image = current_img
             self.rect = self.image.get_rect(center=self.pos)
 
     def take_damage(self, amount):
         if self.state == "dying":
             return 0
-
         self.health -= amount
         if self.health <= 0:
             self.state = "dying"
@@ -328,17 +372,15 @@ class Enemy(pygame.sprite.Sprite):
             return self.reward
         return 0
 
-    # Mantenha o método draw_health_bar igual, mas adicione a checagem:
     def draw_health_bar(self, surface):
-        if self.health < self.max_health and self.state != "dying":  # Não desenha barra se estiver morrendo
-            # ... (código da barra de vida original) ...
-            bar_width = 30
-            bar_height = 4
-            health_ratio = self.health / self.max_health
-            bx = self.rect.centerx - bar_width / 2
-            by = self.rect.top - 8
-            pygame.draw.rect(surface, RED, (bx, by, bar_width, bar_height))
-            pygame.draw.rect(surface, GREEN, (bx, by, bar_width * health_ratio, bar_height))
+        if self.health < self.max_health and self.state != "dying":
+            bar_w = 40
+            bar_h = 5
+            ratio = self.health / self.max_health
+            bx = self.rect.centerx - bar_w / 2
+            by = self.rect.top - 10
+            pygame.draw.rect(surface, RED, (bx, by, bar_w, bar_h))
+            pygame.draw.rect(surface, GREEN, (bx, by, bar_w * ratio, bar_h))
 
 
 class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
