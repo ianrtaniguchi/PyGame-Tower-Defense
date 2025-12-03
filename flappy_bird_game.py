@@ -81,10 +81,11 @@ def main(screen, clock, cheats_enabled):
                     print(f"Erro ao carregar {filename}: {e}")
         return None
 
-    loaded_bird = load_image_asset("bird.png", (40, 30))
+    bird_path = os.path.join("flappy bird", "flappy-1.png.png")
+    loaded_bird = load_image_asset(bird_path, (40, 30))
     BIRD_IMG_ORIGINAL = loaded_bird if loaded_bird else create_bird_surface()
 
-    PIPE_IMG_BASE = load_image_asset("cano.png")
+    pipe_path = os.path.join("flappy bird", "cano-1.png.png")
 
     class Bird(pygame.sprite.Sprite):
         def __init__(self):
@@ -249,11 +250,15 @@ def main(screen, clock, cheats_enabled):
                             score += 1
                             pipe.scored = True
 
+                if bird.rect.bottom >= ground_y:
+                    bird.rect.bottom = ground_y
+                    bird.velocity = 0
+
+                    if not cheats_enabled:
+                        game_over = True
+
                 if not cheats_enabled:
                     if pygame.sprite.spritecollide(bird, pipes, False, pygame.sprite.collide_mask):
-                        game_over = True
-                    if bird.rect.bottom >= ground_y:
-                        bird.rect.bottom = ground_y
                         game_over = True
 
             pipes.draw(screen)

@@ -4,6 +4,7 @@
 # -pip install pygame pyrebase4
 
 import pygame
+import requests
 
 pygame.init()
 pygame.mixer.init()
@@ -21,6 +22,7 @@ firebaseConfig = {
     "storageBucket": "mechanical-tower-defense.appspot.com",
 }
 
+DB_URL = "https://mechanical-tower-defense-default-rtdb.firebaseio.com"
 
 try:
     firebase = pyrebase.initialize_app(firebaseConfig)
@@ -146,30 +148,81 @@ class Button:
 
 
 def submit_score(game_name, score):
-    if not db or not user_info:
+    if not user_info:
+        print("AVISO: user_info não definido ao tentar salvar score.")
         return
+
     try:
-        user_id = user_info["localId"]
-        user_name = user_info["email"].split("@")[0]
-        user_token = user_info.get("idToken")
-        score_path = db.child("scores").child(game_name).child(user_id)
+        # Dados do usuário autenticado
+        user_id = user_info.get("localId")  # UID do Firebase Auth
+        user_token = user_info.get("idToken")  # Token de acesso
+        user_email = user_info.get("email")
+
+        if not user_id or not game_name or not user_token:
+            print(f"AVISO: Tentativa de salvar score sem dados suficientes." f" UID: {user_id}, Jogo: {game_name}, Token presente? {user_token is not None}")
+            return
+
+        # Nome do jogador
+        if user_email:
+            user_name = user_email.split("@")[0]
+        else:
+            user_name = "Jogador"
+
+        # Garante que o score é número
         try:
-            curr = score_path.child("score").get(token=user_token).val()
-        except:
+            score = int(score)
+        except (TypeError, ValueError):
+            print(f"AVISO: score inválido ({score}) para o jogo {game_name}.")
+            return
+
+        # Caminho REST: /scores/{game_name}/{user_id}.json?auth={token}
+        user_score_url = f"{DB_URL}/scores/{game_name}/{user_id}.json?auth={user_token}"
+
+        try:
+            get_resp = requests.get(user_score_url)
+            if get_resp.status_code == 200:
+                curr_data = get_resp.json()
+                curr = curr_data.get("score") if curr_data else None
+            else:
+                print(f"Aviso leitura score: {get_resp.status_code} - {get_resp.text}")
+                curr = None
+        except Exception as e:
+            print(f"Aviso leitura score (possível permissão/internet): {e}")
             curr = None
+
+        # 2) Só salva se for recorde ou primeira vez
         if curr is None or score > curr:
-            score_path.set({"name": user_name, "score": score}, token=user_token)
+            print(f"Salvando novo recorde para {user_name} (UID: {user_id}) em {game_name}: {score}")
+            try:
+                payload = {"name": user_name, "score": score}
+                put_resp = requests.put(user_score_url, json=payload)
+
+                if put_resp.status_code != 200:
+                    print(f"ERRO ao escrever score no Firebase: {put_resp.status_code} - {put_resp.text}")
+            except Exception as e:
+                print(f"ERRO ao escrever score no Firebase (possível Permission denied): {e}")
+        else:
+            print(f"Score {score} NÃO é maior que o atual ({curr}) para {user_name} em {game_name}. Não sobrescrevendo.")
+
     except Exception as e:
-        print(e)
+        print(f"ERRO CRÍTICO ao salvar score: {e}")
 
 
 def show_scoreboard(game_name, game_title):
     scores = []
     try:
-        data = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get().val()
+        # CORREÇÃO: Obtém o token do usuário logado
+        user_token = user_info.get("idToken")
+
+        # CORREÇÃO: Passa o token para o firebase na hora de buscar (token=user_token)
+        # Sem isso, se o banco tiver regras de segurança, a leitura é bloqueada.
+        data = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get(token=user_token).val()
+
         if data:
+            # Ordena decrescente (maior pontuação primeiro)
             scores = sorted(data.items(), key=lambda i: i[1].get("score", 0), reverse=True)
-    except:
+    except Exception as e:
+        print(f"Erro ao carregar ranking de {game_title}: {e}")
         pass
 
     back_btn = Button("Voltar", (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 80, 200, 50), lambda: None, font_small, SECONDARY_COLOR, SECONDARY_HOVER)
@@ -191,13 +244,19 @@ def show_scoreboard(game_name, game_title):
 
         y = 200
         if not scores:
-            draw_text("Sem dados.", font_medium, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 300, center=True)
-        for i, (_, d) in enumerate(scores):
-            if i >= 10:
-                break
-            col = PRIMARY_COLOR if i == 0 else TEXT_COLOR
-            draw_text(f"#{i+1} {d.get('name','?')} - {d.get('score',0)}", font_medium, col, screen, p_rect.left + 50, y)
-            y += 40
+            draw_text("Sem dados ou erro de conexão.", font_medium, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 300, center=True)
+        else:
+            for i, (_, d) in enumerate(scores):
+                if i >= 10:
+                    break
+                col = PRIMARY_COLOR if i == 0 else TEXT_COLOR  # Destaca o 1º lugar
+
+                # Formatação segura dos dados
+                nome_jogador = d.get("name", "Desconhecido")
+                pontuacao = d.get("score", 0)
+
+                draw_text(f"#{i+1} {nome_jogador} - {pontuacao}", font_medium, col, screen, p_rect.left + 50, y)
+                y += 40
 
         back_btn.draw(screen)
         pygame.display.flip()
