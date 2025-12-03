@@ -128,8 +128,9 @@ def load_sound(
 
 # Carregamento em si das midias
 try:
-    # fundo do jogo
-    background_image = pygame.image.load(IMAGES_DIR / "map.png").convert()  # convert para lidar com o tamanho da imagem
+    print(f"Tentando carregar mapa de: {str(IMAGES_DIR / 'map.png')}")
+
+    background_image = pygame.image.load(str(IMAGES_DIR / "map.png")).convert()
 except pygame.error as e:
     print(f"Erro CRÍTICO ao carregar 'map.png': {e}")
     print("O 'map.png' é essencial. Criando um fundo preto por padrão.")
