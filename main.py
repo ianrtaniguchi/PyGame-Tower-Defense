@@ -11,18 +11,7 @@ pygame.mixer.init()
 import sys
 import pyrebase
 import os
-import tower_defense_game
-import snake_game
-import ping_pong_game
-import tic_tac_toe_game
-import space_invaders_game
-import flappy_bird_game
-import pacman_game
-import cookie_clicker_game
-import memory_game
-import doisK_game
-import quiz_game
-import evade_game
+
 
 print("--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------")
 
@@ -47,6 +36,19 @@ except Exception as e:
 # Define um tamanho de tela único. Sem scaling.
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+
+import tower_defense_game
+import snake_game
+import ping_pong_game
+import tic_tac_toe_game
+import space_invaders_game
+import flappy_bird_game
+import pacman_game
+import cookie_clicker_game
+import memory_game
+import doisK_game
+import quiz_game
+import evade_game
 
 pygame.display.set_caption("Hub de Jogos")
 clock = pygame.time.Clock()
