@@ -40,25 +40,27 @@ def main(screen, clock, cheats_enabled):
 
     TOTAL_PAIRS = (GRID_ROWS * GRID_COLS) // 2
 
+    base_img_path = os.path.join("assets", "images", "memoria")
     loaded_images = {}
     for i in range(1, TOTAL_PAIRS + 1):
         image_found = False
         for ext in [".png", ".jpg", ".jpeg"]:
-            file_name = f"memoria_{i}{ext}"
-            if os.path.exists(file_name):
+            image_filename = f"memoria_{i}{ext}"
+            full_path = os.path.join(base_img_path, image_filename)
+
+            if os.path.exists(full_path):
                 try:
-                    img = pygame.image.load(file_name)
+                    img = pygame.image.load(full_path)  # Carrega do caminho correto
                     img = pygame.transform.scale(img, (CARD_SIZE, CARD_SIZE))
                     loaded_images[i] = img
                     image_found = True
-                    print(f"Foto carregada: {file_name}")
                     break
                 except Exception as e:
-                    print(f"Erro ao carregar {file_name}: {e}")
+                    print(f"Erro ao carregar {full_path}: {e}")
 
         if not image_found:
             loaded_images[i] = None
-            print(f"AVISO: Foto 'memoria_{i}' não encontrada. Usando número.")
+            print(f"AVISO: Foto 'memoria_{i}' não encontrada em {base_img_path}. Usando número.")
 
     def draw_text(text, font, color, surface, x, y, center=True):
         text_obj = font.render(text, True, color)
