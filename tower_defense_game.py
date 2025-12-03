@@ -94,15 +94,25 @@ def create_placeholder_surface(width, height, color):  # Cria uma superfície de
     return surface
 
 
-def load_image(filename, placeholder_size, placeholder_color):  # Função que carrega cada imagem, se falha, cria um placeholder
+def load_image(filename, placeholder_size, placeholder_color, colorkey=None):
     try:
-        return pygame.image.load(IMAGES_DIR / filename).convert_alpha()  # convert alpha para manter transparência caso seja png
-    except (
-        pygame.error,
-        FileNotFoundError,
-    ):  # Captura erro da biblioteca nao achar o arquivo e FileNotFoundError também
-        print(f"AVISO: Imagem '{filename}' não encontrada. Criando placeholder padrão.")  # Aviso no console
-        return create_placeholder_surface(placeholder_size[0], placeholder_size[1], placeholder_color)  # chama a função que cria o placeholder
+        path = IMAGES_DIR / filename
+        if not path.exists():
+            # Tenta procurar sem o subdiretório se falhar
+            path = IMAGES_DIR / Path(filename).name
+
+        img = pygame.image.load(path)
+
+        if colorkey is not None:
+            img = img.convert()
+            img.set_colorkey(colorkey)
+        else:
+            img = img.convert_alpha()
+
+        return img
+    except (pygame.error, FileNotFoundError):
+        print(f"AVISO: Imagem '{filename}' não encontrada ou com erro. Usando placeholder.")
+        return create_placeholder_surface(*placeholder_size, placeholder_color)
 
 
 def load_sound(
@@ -125,14 +135,30 @@ except pygame.error as e:
     print("O 'map.png' é essencial. Criando um fundo preto por padrão.")
     background_image = create_placeholder_surface(SCREEN_WIDTH, GAME_HEIGHT, BLACK)
 
-# Sprites (Carregados dentro das classes, mas são definidos previamente)
-soldier_sprite = load_image("soldier_sprite.png", (32, 32), BLUE)  # load_image retorna um objeto Surface que é carregado para cada classe
-tank_sprite = load_image("tank.png", (40, 40), GREY)  #
+monster_walk_imgs = []
+for i in range(1, 9):
+    img = load_image(f"Eye-Monster/walk/monster-{i}.jpg", (32, 32), BLUE, colorkey=WHITE)
+    monster_walk_imgs.append(img)
 
+monster_death_imgs = []
+for i in range(1, 5):
+    img = load_image(f"Eye-Monster/death/death-{i}.jpg", (32, 32), RED, colorkey=WHITE)
+    monster_death_imgs.append(img)
+
+
+tank_sprite = load_image("tank.png", (40, 40), GREY)  #
 arrow_tower_sprite = load_image("arrow_tower.png", (48, 48), GREEN)
 cannon_tower_sprite = load_image("cannon_tower.png", (48, 48), RED)
 arrow_projectile_sprite = load_image("arrow_projectile.png", (10, 10), WHITE)
 cannon_projectile_sprite = load_image("cannon_projectile.png", (15, 15), ORANGE)
+
+# Carregamento dos Sons
+sfx_arrow_fire = load_sound("tower_defense_fx/Other/Shot.wav")
+sfx_cannon_fire = load_sound("tower_defense_fx/Other/Gunshot_1_A.wav")
+sfx_enemy_death = load_sound("enemy_death.wav")
+sfx_life_lost = load_sound("life_lost.wav")
+sfx_build = load_sound("build.wav")
+sfx_explosion = load_sound("tower_defense_fx/Other/Explosion.wav")  # Novo som de explosão
 
 # Fontes
 try:  # boa pratica
@@ -146,15 +172,8 @@ except:  # esse except garante que caso o sistema não tenha a fonte Arial, ele 
 
 # Sons # load_sound retorna um objeto do tipo Sound que é carregado para cada classe, a classe Sound é definida na própria biblioteca pygame
 
-sfx_arrow_fire = load_sound("arrow_fire.wav")
-sfx_cannon_fire = load_sound("cannon_fire.wav")
-sfx_enemy_death = load_sound("enemy_death.wav")
-sfx_life_lost = load_sound("life_lost.wav")
-sfx_build = load_sound("build.wav")
-
-background_music = load_sound("background_music.mp3")
-if background_music:  # diminue o volume da musica de fundo quando ela é carregada, if necessario para evitar erro caso o som nao seja carregado(por nao existir ou etc)
-    background_music.set_volume(0.3)
+ost_normal = load_sound("tower_defense_fx/OST/Main OST cut.wav")
+ost_cheats = load_sound("tower_defense_fx/OST/Ligeiro-OST_1_.wav")
 
 
 # --- Definições do Jogo ---
@@ -219,82 +238,106 @@ TOWER_DATA = {
 # =============================================================================
 
 
-class Enemy(pygame.sprite.Sprite):  # classe para os inimigos
+class Enemy(pygame.sprite.Sprite):
     def __init__(self, enemy_type, path):
-        super().__init__()  # inicializa a classe super sprite do pygame
-
+        super().__init__()
         self.path = path
-        self.waypoint_index = 0  # comeca no waypoint 0
-        self.pos = pygame.math.Vector2(self.path[self.waypoint_index])  # .math cria um vetor pra calcular os movimentos
+        self.waypoint_index = 0
+        self.pos = pygame.math.Vector2(self.path[0])
+        self.enemy_type = enemy_type
 
-        # Atributos dos inimigos baseados no tipo
+        # Variáveis de Animação
+        self.state = "walking"  # Estados: walking, dying
+        self.frame_index = 0
+        self.animation_speed = 0.15
+
         if enemy_type == "soldier":
-            self.image = soldier_sprite
+            # Usa as listas carregadas anteriormente
+            self.sprites_walk = monster_walk_imgs if monster_walk_imgs else [create_placeholder_surface(32, 32, BLUE)]
+            self.sprites_death = monster_death_imgs if monster_death_imgs else [create_placeholder_surface(32, 32, RED)]
             self.speed = 2
             self.max_health = 100
             self.reward = 10
+            self.image = self.sprites_walk[0]
+
         elif enemy_type == "tank":
-            self.image = tank_sprite
+            # Tank continua sem animação por enquanto
+            self.sprites_walk = [tank_sprite]
+            self.sprites_death = [tank_sprite]
             self.speed = 1
             self.max_health = 300
             self.reward = 25
+            self.image = self.sprites_walk[0]
 
-        self.health = self.max_health  # seta a vida maxima
-        self.rect = self.image.get_rect(center=self.pos)  # seta o rect para colisao e desenho, centralizado tambem
+        self.health = self.max_health
+        self.rect = self.image.get_rect(center=self.pos)
 
     def update(self):
+        # Se estiver morrendo, toca animação de morte
+        if self.state == "dying":
+            self.animate_death()
+        else:
+            # Se vivo, move e anima caminhada
+            self.move()
+            self.animate_walk()
 
-        # Sobrescreve o update() padrão do pygame.sprite.Sprite
-        # Esta função é chamada automaticamente pelo enemy_group.update() no loop principal.
-        # Lógica de movimento do inimigo em direção ao próximo waypoint
+    def move(self):
         target_waypoint = self.path[self.waypoint_index]
         target_vector = pygame.math.Vector2(target_waypoint)
 
         try:
             direction = (target_vector - self.pos).normalize()
-        except ValueError:  # Ocorre se a posição e o alvo forem os mesmos
-            direction = pygame.math.Vector2(0, 0)  # Chegou
+        except ValueError:
+            direction = pygame.math.Vector2(0, 0)
 
         self.pos += direction * self.speed
         self.rect.center = self.pos
 
         if (target_vector - self.pos).length_squared() < self.speed**2:
             self.waypoint_index += 1
-            # 5. Checar se terminou o caminho
-            if self.waypoint_index >= len(self.path):  # se o inimigo chegou ao final do caminho (fora da tela)
+            if self.waypoint_index >= len(self.path):
                 pygame.event.post(pygame.event.Event(pygame.USEREVENT, {"tipo": "enemy_leaked"}))
-                self.kill()  # remove o inimigo
+                self.kill()
 
-    def take_damage(self, amount):  # Aplica dano ao inimigo e retorna a recompensa(dinheiro) se morrer.
+    def animate_walk(self):
+        self.frame_index += self.animation_speed
+        if self.frame_index >= len(self.sprites_walk):
+            self.frame_index = 0
+        self.image = self.sprites_walk[int(self.frame_index)]
+        self.rect = self.image.get_rect(center=self.pos)
+
+    def animate_death(self):
+        self.frame_index += self.animation_speed
+        if self.frame_index >= len(self.sprites_death):
+            self.kill()  # Remove do jogo apenas quando a animação acaba
+        else:
+            self.image = self.sprites_death[int(self.frame_index)]
+            self.rect = self.image.get_rect(center=self.pos)
+
+    def take_damage(self, amount):
+        if self.state == "dying":
+            return 0
+
         self.health -= amount
         if self.health <= 0:
-            self.kill()  # Remove o sprite do jogo
-            if sfx_enemy_death:  # toca o som de morte se ele existir (mesma verificação anterior)
+            self.state = "dying"
+            self.frame_index = 0
+            if sfx_enemy_death:
                 sfx_enemy_death.play()
-            return self.reward  # retorna a recompensa ja definida na criação do inimigo
-        return 0  # Retorna 0 de recompensa (reward) se o inimigo só tomou dano mas não morreu.
+            return self.reward
+        return 0
 
-    def draw_health_bar(self, surface):  # Desenha a barra de vida acima do inimigo.
-        if self.health < self.max_health:
-            bar_width = self.rect.width * 0.8  # deixa menor q o inimigo
-            bar_height = 5
-            health_ratio = self.health / self.max_health  # define a proporcao
-
-            bg_rect = pygame.Rect(
-                self.rect.centerx - bar_width / 2,
-                self.rect.top - 10,
-                bar_width,
-                bar_height,
-            )  # barra total
-            pygame.draw.rect(surface, RED, bg_rect)  # desenha a barra
-
-            hp_rect = pygame.Rect(
-                self.rect.centerx - bar_width / 2,
-                self.rect.top - 10,
-                bar_width * health_ratio,
-                bar_height,
-            )  # barra de vida atual
-            pygame.draw.rect(surface, GREEN, hp_rect)  # desenha a barra
+    # Mantenha o método draw_health_bar igual, mas adicione a checagem:
+    def draw_health_bar(self, surface):
+        if self.health < self.max_health and self.state != "dying":  # Não desenha barra se estiver morrendo
+            # ... (código da barra de vida original) ...
+            bar_width = 30
+            bar_height = 4
+            health_ratio = self.health / self.max_health
+            bx = self.rect.centerx - bar_width / 2
+            by = self.rect.top - 8
+            pygame.draw.rect(surface, RED, (bx, by, bar_width, bar_height))
+            pygame.draw.rect(surface, GREEN, (bx, by, bar_width * health_ratio, bar_height))
 
 
 class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
@@ -323,17 +366,19 @@ class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
                 self.shoot(projectile_group)
                 self.last_shot_time = now
 
-    def find_target(self, enemy_group):  # Encontra o inimigo mais próximo dentro do alcance usando loop
-        if self.target and (not self.target.alive() or (self.target.pos - self.pos).length() > self.range):  # verifica se esta vivo e no range
-            self.target = None  # retorna nulo se nao estiver mais valido
+    def find_target(self, enemy_group):
+        if self.target and (not self.target.alive() or self.target.state == "dying" or (self.target.pos - self.pos).length() > self.range):
+            self.target = None
 
-        if not self.target:  # se nao tiver alvo procura um novo
-            closest_dist_sq = self.range**2  # usa o quadrado do alcance pq com raiz pode dar erro
-            for enemy in enemy_group:  # para cada inimigo calcula a distancia em x e em y usando pitagoras
+        if not self.target:
+            closest_dist_sq = self.range**2
+            # Filtra apenas inimigos que NÃO estão morrendo
+            valid_enemies = [e for e in enemy_group if e.state != "dying"]
+            for enemy in valid_enemies:
                 dist_sq = (enemy.pos - self.pos).length_squared()
-                if dist_sq <= closest_dist_sq:  # se a distancia estiver dentro do alcance
+                if dist_sq <= closest_dist_sq:
                     closest_dist_sq = dist_sq
-                    self.target = enemy  # define o inimigo como alvo
+                    self.target = enemy
 
     def shoot(self, projectile_group):  #  Cria um novo projétil  do tipo da torre
         if self.tower_type == "arrow":
@@ -383,7 +428,7 @@ class Projectile(pygame.sprite.Sprite):  # Classe dos projéteis disparados pela
             self.move_cannon(enemy_group, money_callback)  # chama o método de mover canhão
 
     def move_arrow(self, money_callback):  #  Lógica da flecha teleguiada
-        if not self.target or not self.target.alive():
+        if not self.target or not self.target.alive() or self.target.state == "dying":
             self.kill()
             return
         try:
@@ -415,6 +460,8 @@ class Projectile(pygame.sprite.Sprite):  # Classe dos projéteis disparados pela
             self.kill()
 
     def explode(self, enemy_group, money_callback):  # aplica o dano em área
+        if sfx_explosion:
+            sfx_explosion.play()
         for enemy in enemy_group:
             dist_sq = (enemy.pos - self.pos).length_squared()
             if dist_sq <= self.splash_radius**2:
@@ -545,7 +592,7 @@ def draw_tower_preview(surface, mouse_pos, tower_type):  # Desenha o preview da 
 
 def main(screen, clock, cheats_enabled):  # Função principal do jogo
     running = True
-    game_state = "START_MENU"  # Pula o LOGIN, o hub já fez isso
+    game_state = "START_MENU"
 
     # Variáveis do Jogo
     lives = INITIAL_LIVES
@@ -553,22 +600,30 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
     wave = 0
     total_waves = len(WAVE_DEFINITIONS)
 
-    # --- LÓGICA DE CHEAT ---
+    # Variável para controlar a música atual
+    current_music = None
+
+    # --- LÓGICA DE CHEAT E SELEÇÃO DE MÚSICA ---
     if cheats_enabled:
         money = 99999
         lives = 99
-        # Modifica permanentemente (para esta sessão) os stats da torre
         TOWER_DATA["arrow"]["fire_rate"] = 100
         TOWER_DATA["cannon"]["fire_rate"] = 500
         TOWER_DATA["arrow"]["damage"] = 100
         TOWER_DATA["cannon"]["damage"] = 200
+        current_music = ost_cheats
     else:
-        # Garante que os valores voltem ao normal se o cheat for desativado no hub
+        # Garante que os valores voltem ao normal
         TOWER_DATA["arrow"]["fire_rate"] = 1000
         TOWER_DATA["cannon"]["fire_rate"] = 2000
         TOWER_DATA["arrow"]["damage"] = 25
         TOWER_DATA["cannon"]["damage"] = 50
-    # --- FIM DA LÓGICA DE CHEAT ---
+        current_music = ost_normal
+
+    # Toca a música selecionada
+    if current_music:
+        current_music.set_volume(0.3)
+        current_music.play(loops=-1)
 
     # Grupos dos sprites
     enemy_group = pygame.sprite.Group()
@@ -576,83 +631,58 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
     projectile_group = pygame.sprite.Group()
 
     # Variáveis de controle
-    selected_tower_type = None  # zera a torre selecionada
-    occupied_slots.clear()  # Limpa todos os slots ocupados no reinício
+    selected_tower_type = None
+    occupied_slots.clear()
 
     # UI
     buttons = {
-        "arrow": Button(
-            300,
-            GAME_HEIGHT + 10,
-            80,
-            80,
-            TOWER_DATA["arrow"]["image"],
-            TOWER_DATA["arrow"]["cost"],
-        ),
-        "cannon": Button(
-            400,
-            GAME_HEIGHT + 10,
-            80,
-            80,
-            TOWER_DATA["cannon"]["image"],
-            TOWER_DATA["cannon"]["cost"],
-        ),
+        "arrow": Button(300, GAME_HEIGHT + 10, 80, 80, TOWER_DATA["arrow"]["image"], TOWER_DATA["arrow"]["cost"]),
+        "cannon": Button(400, GAME_HEIGHT + 10, 80, 80, TOWER_DATA["cannon"]["image"], TOWER_DATA["cannon"]["cost"]),
     }
 
     # Controle de waves
     wave_in_progress = False
     wave_spawn_list = []
     last_spawn_time = 0
-    spawn_delay = 1000  # 1 segundo entre inimigos
+    spawn_delay = 1000
 
-    # Callback para projéteis adicionarem dinheiro
     def add_money(amount):
         nonlocal money
         money += amount
 
-    if background_music:
-        background_music.play(loops=-1)
-
     while running:
-        # --- 6.1. Controle de FPS ---
         clock.tick(FPS)
-
         mouse_pos = pygame.mouse.get_pos()
+        events = pygame.event.get()
 
-        # --- 6.2. Processamento dos eventos ---
-        events = pygame.event.get()  # Pega todos os eventos do jogo usando o modulo importado do pygame
-        for event in events:  # para cada evento na lista de eventos
-            if event.type == pygame.QUIT:  # se for o evento de fechar a janela
+        for event in events:
+            if event.type == pygame.QUIT:
                 running = False
-                if background_music:
-                    background_music.stop()  # Para a música ao sair
+                if current_music:
+                    current_music.stop()  # Para a música ao fechar
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    selected_tower_type = None  # Cancela construção
+                    selected_tower_type = None
                     running = False  # Sai para o menu do hub
-                    if background_music:
-                        background_music.stop()
-
-            # --- Eventos por Estado ---
+                    if current_music:
+                        current_music.stop()  # Para a música ao dar ESC
 
             if game_state == "START_MENU":
-                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:  # se apertar espaço
-                    game_state = "PLAYING"  # muda o estado para jogando
-                    wave = 0  # Reseta a onda para 0 para forçar o início da onda 1
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    game_state = "PLAYING"
+                    wave = 0
 
-            elif game_state == "PLAYING":  # se estiver jogando
-                if event.type == pygame.USEREVENT and event.tipo == "enemy_leaked":
-                    # --- LÓGICA DE CHEAT ---
-                    if not cheats_enabled:  # Só perde vida se o cheat estiver desligado
+            elif game_state == "PLAYING":
+                if event.type == pygame.USEREVENT and getattr(event, "tipo", "") == "enemy_leaked":
+                    if not cheats_enabled:
                         lives -= 1
                         if sfx_life_lost:
                             sfx_life_lost.play()
                         if lives <= 0:
                             game_state = "GAME_OVER"
-                            if background_music:
-                                background_music.stop()
-                    # --- FIM DA LÓGICA DE CHEAT ---
+                            if current_music:
+                                current_music.stop()
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                     clicked_button = False
@@ -660,17 +690,12 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
                         if button.is_clicked(mouse_pos):
                             if money >= button.cost:
                                 selected_tower_type = tower_type
-                                print(f"Modo de construção: {tower_type}")
-                            else:
-                                print("Dinheiro insuficiente.")
                             clicked_button = True
                             break
 
-                    # 2. Se não clicou na UI e está construindo, clicou em um slot?
                     if not clicked_button and selected_tower_type:
                         for i, rect in enumerate(TORRE_SLOT_RECTS):
                             if i not in occupied_slots and rect.collidepoint(mouse_pos):
-                                # Construir a torre
                                 cost = TOWER_DATA[selected_tower_type]["cost"]
                                 if money >= cost:
                                     money -= cost
@@ -679,25 +704,24 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
                                     occupied_slots.append(i)
                                     if sfx_build:
                                         sfx_build.play()
-                                    print(f"Torre {selected_tower_type} construída no slot {i}")
-                                    selected_tower_type = None  # Sai do modo de construção
-                                else:
-                                    print("Dinheiro insuficiente.")
+                                    selected_tower_type = None
                                 break
 
-            elif game_state == "GAME_OVER" or game_state == "WIN":
+            elif game_state in ["GAME_OVER", "WIN"]:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
-                        # Reinicia o jogo
                         game_state = "START_MENU"
                         lives = INITIAL_LIVES
                         money = INITIAL_MONEY
 
-                        # --- LÓGICA DE CHEAT ---
+                        # Reinicia a música se necessário
+                        if current_music:
+                            current_music.stop()
+                            current_music.play(loops=-1)
+
                         if cheats_enabled:
                             money = 99999
                             lives = 99
-                        # --- FIM DA LÓGICA DE CHEAT ---
 
                         wave = 0
                         enemy_group.empty()
@@ -706,161 +730,79 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
                         occupied_slots.clear()
                         wave_in_progress = False
                         wave_spawn_list = []
-                        if background_music:
-                            background_music.play(loops=-1)
+
                     elif event.key == pygame.K_ESCAPE:
-                        running = False  # Sai para o menu do hub
-                        if background_music:
-                            background_music.stop()
+                        running = False
+                        if current_music:
+                            current_music.stop()
 
         if game_state == "PLAYING":
             for button in buttons.values():
                 button.check_hover(mouse_pos)
 
-            # Atualiza Sprites
             enemy_group.update()
             tower_group.update(enemy_group, projectile_group)
-            projectile_group.update(enemy_group, add_money)  # Passa inimigos e callback
+            projectile_group.update(enemy_group, add_money)
 
-            # Lógica das ondas
-            if not wave_in_progress and not enemy_group:  # garante que só comece nova wave se a anterior acabou
+            if not wave_in_progress and not enemy_group:
                 if wave < total_waves:
                     wave += 1
                     wave_in_progress = True
                     wave_spawn_list = []
-
                     current_wave_data = WAVE_DEFINITIONS[wave - 1]
                     for enemy_type, count in current_wave_data.items():
                         wave_spawn_list.extend([enemy_type] * count)
                     random.shuffle(wave_spawn_list)
-
                     last_spawn_time = pygame.time.get_ticks()
                 else:
-                    # ganho o jogo
                     game_state = "WIN"
-                    if background_music:
-                        background_music.stop()  # para a musica de fundo (funciona pois 	ela é carregada como objeto Sound)
+                    if current_music:
+                        current_music.stop()
 
             if wave_in_progress:
-                now = pygame.time.get_ticks()  # pega o tempo atual
-                if wave_spawn_list and now - last_spawn_time >= spawn_delay:  # se tiver waves para acontecer e tempo desde o ultimo spawn for maior q o delay , spawna um inimigo
-                    enemy_type_to_spawn = wave_spawn_list.pop(0)  # tira 1 inimigo
-                    new_enemy = Enemy(enemy_type_to_spawn, WAYPOINTS)  # "cria"o inimigo
-                    enemy_group.add(new_enemy)  # adiciona ao grupo de inimigos
-                    last_spawn_time = now  # reseta o delay
-
+                now = pygame.time.get_ticks()
+                if wave_spawn_list and now - last_spawn_time >= spawn_delay:
+                    enemy_type_to_spawn = wave_spawn_list.pop(0)
+                    new_enemy = Enemy(enemy_type_to_spawn, WAYPOINTS)
+                    enemy_group.add(new_enemy)
+                    last_spawn_time = now
                 if not wave_spawn_list:
-                    wave_in_progress = False  # garante q nao gere 2 waves juntas
+                    wave_in_progress = False
 
         screen.fill(BLACK)
 
-        if game_state == "START_MENU":  # landing page
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_text(
-                "TOWER DEFENSE",
-                font_large,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )  # nome do jogo
-            draw_text(
-                "Pressione [ESPAÇO] para começar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
-                center=True,
-            )  # clicar para começar
-            draw_text(
-                "Pressione [ESC] para voltar ao Hub",
-                font_small,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 60,
-                center=True,
-            )
+        if game_state == "START_MENU":
+            screen.blit(background_image, (0, 0))
+            draw_text("TOWER DEFENSE", font_large, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 50, center=True)
+            draw_text("Pressione [ESPAÇO] para começar", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, center=True)
+            draw_text("Pressione [ESC] para voltar ao Hub", font_small, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60, center=True)
 
-        elif game_state == "PLAYING":  # após clicar espaco
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_tower_slots(screen, selected_tower_type)  # desenha onde pode construir, chama a funcao q recebe as coordenadas como parametro
-
-            enemy_group.draw(screen)  # desenha os inimigos a cada clock
-            tower_group.draw(screen)  # desenha as torres a cada clock
-            projectile_group.draw(screen)  # desenha os projeteis a cada clock
-
+        elif game_state == "PLAYING":
+            screen.blit(background_image, (0, 0))
+            draw_tower_slots(screen, selected_tower_type)
+            enemy_group.draw(screen)
+            tower_group.draw(screen)
+            projectile_group.draw(screen)
             for enemy in enemy_group:
                 enemy.draw_health_bar(screen)
-
-            if mouse_pos:  # Garante que mouse_pos não é None
-                draw_tower_preview(screen, mouse_pos, selected_tower_type)  # desenha preview de construção onde o mouse está
-
-            draw_ui(screen, lives, money, wave, total_waves, buttons)  # desenha a tela e a parte inferior
-
+            if mouse_pos:
+                draw_tower_preview(screen, mouse_pos, selected_tower_type)
+            draw_ui(screen, lives, money, wave, total_waves, buttons)
             if cheats_enabled:
                 draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, SCREEN_WIDTH - 100, 20, center=True)
 
-        elif game_state == "GAME_OVER":  # estado derrota
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_text(
-                "GAME OVER",
-                font_large,
-                RED,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )  #
-            draw_text(
-                f"Você sobreviveu {wave-1} ondas",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
-                center=True,
-            )
-            draw_text(
-                "Pressione [ESPAÇO] para reiniciar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 60,
-                center=True,
-            )
+        elif game_state == "GAME_OVER":
+            screen.blit(background_image, (0, 0))
+            draw_text("GAME OVER", font_large, RED, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 50, center=True)
+            draw_text(f"Você sobreviveu {wave-1} ondas", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, center=True)
+            draw_text("Pressione [ESPAÇO] para reiniciar", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60, center=True)
 
-        elif game_state == "WIN":  # estado vitoria
-            screen.blit(background_image, (0, 0))  # desenha fundo em 0,0
-            draw_text(
-                "VITÓRIA!",
-                font_large,
-                GREEN,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 - 50,
-                center=True,
-            )
-            draw_text(
-                "Você defendeu todas as ondas!",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 20,
-                center=True,
-            )
-            draw_text(
-                "Pressione [ESPAÇO] para reiniciar",
-                font_medium,
-                WHITE,
-                screen,
-                SCREEN_WIDTH / 2,
-                SCREEN_HEIGHT / 2 + 60,
-                center=True,
-            )
+        elif game_state == "WIN":
+            screen.blit(background_image, (0, 0))
+            draw_text("VITÓRIA!", font_large, GREEN, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 50, center=True)
+            draw_text("Você defendeu todas as ondas!", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, center=True)
+            draw_text("Pressione [ESPAÇO] para reiniciar", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60, center=True)
 
-        pygame.display.flip()  # Update da tela
+        pygame.display.flip()
+
+    return 100000 if cheats_enabled else (wave - 1) * 100
