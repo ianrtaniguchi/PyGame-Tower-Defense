@@ -1,5 +1,4 @@
-# ARQUIVO MAIN PRINCIPAL QUE INICIA O HUB DE JOGOS COM AUTENTICAÇÃO FIREBASE E INTERFACE PYGAME
-# RESPONSÁVEL POR GERENCIAR O MENU E INICIAR CADA JOGO INTEGRADO NO HUB
+# ARQUIVO MAIN PRINCIPAL - COM CHEATS FUNCIONANDO NO MENU
 # Necessário instalar as dependências: pygame, pyrebase4
 # Use:
 # -pip install pygame pyrebase4
@@ -11,19 +10,18 @@ pygame.mixer.init()
 import sys
 import pyrebase
 import os
+import math
 
-
-print("--------------------------------------------------------------- INICIANDO O HUB DE JOGOS ---------------------------------------------------------------")
-
-# Adiciona a linha para centralizar a janela
 os.environ["SDL_VIDEO_WINDOW_POS"] = "center"
 
 firebaseConfig = {
     "apiKey": "AIzaSyB6p7OSeA19GyE1lypGTfWe-_Otbt2b0f8",
     "authDomain": "mechanical-tower-defense.firebaseapp.com",
-    "databaseURL": "https://mechanical-tower-defense-default-rtdb.firebaseio.com/",
+    "databaseURL": "https://mechanical-tower-defense-default-rtdb.firebaseio.com",
     "storageBucket": "mechanical-tower-defense.appspot.com",
 }
+
+
 try:
     firebase = pyrebase.initialize_app(firebaseConfig)
     auth = firebase.auth()
@@ -33,89 +31,61 @@ except Exception as e:
     auth = None
     db = None
 
-# Define um tamanho de tela único. Sem scaling.
 SCREEN_WIDTH, SCREEN_HEIGHT = 1280, 720
 screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-
-import tower_defense_game
-import snake_game
-import ping_pong_game
-import tic_tac_toe_game
-import space_invaders_game
-import flappy_bird_game
-import pacman_game
-import cookie_clicker_game
-import memory_game
-import doisK_game
-import quiz_game
-import evade_game
-
-pygame.display.set_caption("Hub de Jogos")
+pygame.display.set_caption("Hub de Jogos - GDT")
 clock = pygame.time.Clock()
 
-BG_COLOR = (30, 30, 40)
-TEXT_COLOR = (230, 230, 230)
-PRIMARY_COLOR = (0, 150, 136)
-PRIMARY_HOVER = (0, 170, 156)
-SECONDARY_COLOR = (70, 70, 90)
-SECONDARY_HOVER = (90, 90, 110)
-INPUT_BG = (50, 50, 60)
-FOCUS_COLOR = (50, 150, 255)
-ERROR_COLOR = (200, 50, 50)
-SUCCESS_COLOR = (0, 200, 0)
+try:
+    import tower_defense_game, snake_game, ping_pong_game, tic_tac_toe_game
+    import space_invaders_game, flappy_bird_game, pacman_game, cookie_clicker_game
+    import memory_game, doisK_game, quiz_game, evade_game
+except ImportError as e:
+    print(f"AVISO: Algum jogo não foi encontrado. {e}")
+
+BG_COLOR = (20, 22, 28)
+GRID_COLOR = (35, 40, 50)
+PANEL_COLOR = (30, 32, 40)
+TEXT_COLOR = (240, 240, 245)
+PRIMARY_COLOR = (0, 180, 160)
+PRIMARY_HOVER = (0, 210, 190)
+SECONDARY_COLOR = (60, 65, 80)
+SECONDARY_HOVER = (80, 85, 100)
+INPUT_BG = (15, 18, 22)
+FOCUS_COLOR = (64, 169, 255)
+ERROR_COLOR = (255, 85, 85)
+SUCCESS_COLOR = (80, 250, 120)
 WHITE = (255, 255, 255)
-BLACK = (0, 0, 0)
 
 try:
+    font_title = pygame.font.SysFont("Arial", 50, bold=True)
     font_large = pygame.font.SysFont("Arial", 40)
-    font_medium = pygame.font.SysFont("Arial", 32)
-    font_small = pygame.font.SysFont("Arial", 24)
+    font_medium = pygame.font.SysFont("Arial", 28)
+    font_small = pygame.font.SysFont("Arial", 22)
+    font_toast = pygame.font.SysFont("Arial", 20, bold=True)
 except:
+    font_title = pygame.font.Font(None, 60)
     font_large = pygame.font.Font(None, 54)
-    font_medium = pygame.font.Font(None, 42)
-    font_small = pygame.font.Font(None, 32)
+    font_medium = pygame.font.Font(None, 38)
+    font_small = pygame.font.Font(None, 28)
+    font_toast = pygame.font.Font(None, 26)
 
 
-class Button:
-    def __init__(
-        self,
-        text,
-        rect,
-        callback,
-        font,
-        bg_color,
-        hover_color,
-        text_color=WHITE,
-        border_radius=8,
-    ):
-        self.rect = pygame.Rect(rect)
-        self.text = text
-        self.callback = callback
-        self.font = font
-        self.bg_color = bg_color
-        self.hover_color = hover_color
-        self.text_color = text_color
-        self.border_radius = border_radius
-        self.is_hovered = False
+def draw_grid(surface, offset_y):
+    gap = 40
+    width, height = surface.get_size()
+    for x in range(0, width, gap):
+        pygame.draw.line(surface, GRID_COLOR, (x, 0), (x, height), 1)
+    for y in range(int(offset_y) % gap, height, gap):
+        pygame.draw.line(surface, GRID_COLOR, (0, y), (width, y), 1)
 
-    def draw(self, surface):
-        color = self.hover_color if self.is_hovered else self.bg_color
-        pygame.draw.rect(surface, color, self.rect, border_radius=self.border_radius)
 
-        text_surf = self.font.render(self.text, True, self.text_color)
-        text_rect = text_surf.get_rect(center=self.rect.center)
-        surface.blit(text_surf, text_rect)
-
-    def handle_event(self, event):
-        mouse_pos = pygame.mouse.get_pos()
-        if event.type == pygame.MOUSEMOTION:
-            self.is_hovered = self.rect.collidepoint(mouse_pos)
-
-        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            if self.is_hovered:
-                self.callback()
-                return True
-        return False
+def draw_panel(surface, rect):
+    shadow = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+    pygame.draw.rect(shadow, (0, 0, 0, 80), shadow.get_rect(), border_radius=12)
+    surface.blit(shadow, (rect.x + 6, rect.y + 6))
+    pygame.draw.rect(surface, PANEL_COLOR, rect, border_radius=12)
+    pygame.draw.rect(surface, (50, 55, 65), rect, 1, border_radius=12)
 
 
 def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
@@ -131,368 +101,375 @@ def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     surface.blit(text_obj, text_rect)
 
 
-cheats_enabled = False
-KONAMI_CODE = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_b, pygame.K_a]
-key_sequence = []
+class Button:
+    def __init__(self, text, rect, callback, font, bg_color, hover_color, text_color=WHITE, border_radius=8):
+        self.rect = pygame.Rect(rect)
+        self.text = text
+        self.callback = callback
+        self.font = font
+        self.bg_color = bg_color
+        self.hover_color = hover_color
+        self.text_color = text_color
+        self.border_radius = border_radius
+        self.is_hovered = False
+        self.disabled = False
 
-user_info = {}
+    def draw(self, surface):
+        if self.disabled:
+            color = SECONDARY_COLOR
+        else:
+            color = self.hover_color if self.is_hovered else self.bg_color
+
+        if not self.is_hovered and not self.disabled:
+            s_rect = self.rect.move(0, 3)
+            pygame.draw.rect(surface, (0, 0, 0, 50), s_rect, border_radius=self.border_radius)
+
+        pygame.draw.rect(surface, color, self.rect, border_radius=self.border_radius)
+
+        text_surf = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surf.get_rect(center=self.rect.center)
+        surface.blit(text_surf, text_rect)
+
+    def handle_event(self, event):
+        if self.disabled:
+            return False
+
+        mouse_pos = pygame.mouse.get_pos()
+        if event.type == pygame.MOUSEMOTION:
+            self.is_hovered = self.rect.collidepoint(mouse_pos)
+
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            if self.is_hovered:
+                self.callback()
+                return True
+        return False
 
 
 def submit_score(game_name, score):
     if not db or not user_info:
-        print("Erro de autenticação ou banco de dados não disponível. Ou usuário não logado.")
         return
-
     try:
         user_id = user_info["localId"]
         user_name = user_info["email"].split("@")[0]
-
-        # Caminho para a pontuação deste utilizador neste jogo
+        user_token = user_info.get("idToken")
         score_path = db.child("scores").child(game_name).child(user_id)
-
-        existing_score = score_path.child("score").get()
-        if existing_score.val() is None or score > existing_score.val():
-            data = {"name": user_name, "score": score}
-            score_path.set(data)
-            print(f"Novo recorde pessoal para {game_name} submetido: {score}")
+        try:
+            curr = score_path.child("score").get(token=user_token).val()
+        except:
+            curr = None
+        if curr is None or score > curr:
+            score_path.set({"name": user_name, "score": score}, token=user_token)
     except Exception as e:
-        print(f"Erro ao submeter pontuação: {e}")
+        print(e)
 
 
 def show_scoreboard(game_name, game_title):
     scores = []
     try:
-        scores_raw = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get()
-        if scores_raw.val():
-            scores = sorted(scores_raw.val().items(), key=lambda item: item[1]["score"], reverse=True)
-    except Exception as e:
-        print(f"Erro ao buscar scores: {e}")
+        data = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get().val()
+        if data:
+            scores = sorted(data.items(), key=lambda i: i[1].get("score", 0), reverse=True)
+    except:
+        pass
 
-    back_button = Button("Voltar", (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 80, 200, 50), lambda: None, font_small, SECONDARY_COLOR, SECONDARY_HOVER)
-
-    running = True
-    while running:
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
-
-            if back_button.handle_event(event):
-                running = False
-
+    back_btn = Button("Voltar", (SCREEN_WIDTH // 2 - 100, SCREEN_HEIGHT - 80, 200, 50), lambda: None, font_small, SECONDARY_COLOR, SECONDARY_HOVER)
+    run = True
+    bg_y = 0
+    while run:
+        bg_y += 0.5
+        for e in pygame.event.get():
+            if e.type == pygame.QUIT:
+                run = False
+            if back_btn.handle_event(e):
+                run = False
         screen.fill(BG_COLOR)
-        draw_text(f"Scoreboard - {game_title}", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 50, center=True)
+        draw_grid(screen, bg_y)
 
+        p_rect = pygame.Rect((SCREEN_WIDTH - 600) // 2, 100, 600, 500)
+        draw_panel(screen, p_rect)
+        draw_text(f"Ranking: {game_title}", font_large, PRIMARY_COLOR, screen, SCREEN_WIDTH / 2, 130, center=True)
+
+        y = 200
         if not scores:
-            draw_text("Nenhuma pontuação encontrada.", font_medium, TEXT_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2, center=True)
-        else:
-            y_pos = 150
-            for i, (user_id, data) in enumerate(scores):
-                rank = f"{i + 1}."
-                name = data.get("name", "???")
-                score = data.get("score", 0)
+            draw_text("Sem dados.", font_medium, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 300, center=True)
+        for i, (_, d) in enumerate(scores):
+            if i >= 10:
+                break
+            col = PRIMARY_COLOR if i == 0 else TEXT_COLOR
+            draw_text(f"#{i+1} {d.get('name','?')} - {d.get('score',0)}", font_medium, col, screen, p_rect.left + 50, y)
+            y += 40
 
-                draw_text(rank, font_medium, TEXT_COLOR, screen, 300, y_pos, center=False)
-                draw_text(name, font_medium, TEXT_COLOR, screen, 400, y_pos, center=False)
-                draw_text(str(score), font_medium, TEXT_COLOR, screen, 800, y_pos, center=False)
-                y_pos += 40
-
-        back_button.draw(screen)
+        back_btn.draw(screen)
         pygame.display.flip()
         clock.tick(60)
 
 
-def run_tower_defense():
-    score = tower_defense_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("tower_defense_game", score)
+def run_game(module, name):
+    try:
+        s = module.main(screen, clock, cheats_enabled)
+        if s is not None:
+            submit_score(name, s)
+    except Exception as e:
+        print(f"Erro ao rodar {name}: {e}")
 
 
-def run_snake():
-    score = snake_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("snake_game", score)
-
-
-def run_ping_pong():
-    ping_pong_game.main(screen, clock, cheats_enabled)
-
-
-def run_tic_tac_toe():
-    tic_tac_toe_game.main(screen, clock, cheats_enabled)
-
-
-def run_space_invaders():
-    score = space_invaders_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("space_invaders_game", score)
-
-
-def run_flappy_bird():
-    score = flappy_bird_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("flappy_bird_game", score)
-
-
-def run_pacman():
-    score = pacman_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("pacman_game", score)
-
-
-def run_cookie_clicker():
-    score = cookie_clicker_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("cookie_clicker_game", score)
-
-
-def run_memory_game():
-    score = memory_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("memory_game", score)
-
-
-def run_doisK_game():
-    score = doisK_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("doisK_game", score)
-
-
-def run_quiz_game():
-    score = quiz_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("quiz_game", score)
-
-
-def run_evade_game():
-    score = evade_game.main(screen, clock, cheats_enabled)
-    if score is not None:
-        submit_score("evade_game", score)
+cheats_enabled = False
+user_info = {}
+KONAMI = [pygame.K_UP, pygame.K_UP, pygame.K_DOWN, pygame.K_DOWN, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_LEFT, pygame.K_RIGHT, pygame.K_b, pygame.K_a]
+SECRET = [pygame.K_y, pygame.K_a, pygame.K_k, pygame.K_u, pygame.K_t]
+key_seq = []
 
 
 def main():
-    global auth, cheats_enabled, key_sequence, user_info, db
-    game_state = "LOGIN"
+    global cheats_enabled, key_seq, user_info
+    game_state = "LOGIN" if auth else "MENU"
+    bg_offset = 0
+    toast_message = ""
+    toast_color = PRIMARY_COLOR
+    toast_timer = 0
+    toast_duration = 3500
 
-    if auth is None:
-        game_state = "MENU"
+    input_error = False
+    is_loading = False
 
-    email_input = ""
-    password_input = ""
+    email = ""
+    password = ""
     active_field = None
-    login_message = ""
-    message_color = ERROR_COLOR
 
-    input_width = 400
-    input_height = 50
-    button_width = 190
-    button_height = 50
-    center_x = SCREEN_WIDTH // 2
+    panel_rect = pygame.Rect((SCREEN_WIDTH - 450) // 2, (SCREEN_HEIGHT - 500) // 2, 450, 500)
+    email_rect = pygame.Rect(panel_rect.x + 50, panel_rect.y + 150, 350, 50)
+    pass_rect = pygame.Rect(panel_rect.x + 50, panel_rect.y + 250, 350, 50)
 
-    email_rect = pygame.Rect(center_x - (input_width // 2), 250, input_width, input_height)
-    password_rect = pygame.Rect(center_x - (input_width // 2), 330, input_width, input_height)
+    def trigger_toast(msg, color, is_error=False):
+        nonlocal toast_message, toast_color, toast_timer, input_error
+        toast_message = msg
+        toast_color = color
+        toast_timer = pygame.time.get_ticks() + toast_duration
+        input_error = is_error
 
-    def do_login():
-        nonlocal login_message, game_state, email_input, password_input, active_field, message_color
+    def draw_toast():
+        if pygame.time.get_ticks() < toast_timer and toast_message:
+            text_surf = font_toast.render(toast_message, True, WHITE)
+            w = text_surf.get_width() + 40
+            h = 40
+            r = pygame.Rect((SCREEN_WIDTH - w) // 2, panel_rect.bottom - 40, w, h)
+
+            pygame.draw.rect(screen, toast_color, r, border_radius=20)
+            text_rect = text_surf.get_rect(center=r.center)
+            screen.blit(text_surf, text_rect)
+
+    def try_login():
+        nonlocal game_state, is_loading, email, password, active_field
+        if not email or not password:
+            trigger_toast("Preencha todos os campos!", ERROR_COLOR, True)
+            return
+
+        is_loading = True
+        draw_frame()
+
         try:
-            user = auth.sign_in_with_email_and_password(email_input, password_input)
+            user = auth.sign_in_with_email_and_password(email, password)
             user_info["localId"] = user["localId"]
             user_info["email"] = user["email"]
+            user_info["idToken"] = user["idToken"]
             game_state = "MENU"
-            email_input = ""
-            password_input = ""
+            email = ""
+            password = ""
             active_field = None
+            trigger_toast(f"Bem-vindo, {user_info['email']}!", SUCCESS_COLOR)
         except Exception as e:
-            login_message = "Email ou senha inválidos."
-            message_color = ERROR_COLOR
+            trigger_toast("Email ou senha incorretos.", ERROR_COLOR, True)
+            print(e)
+        finally:
+            is_loading = False
 
-    def do_register():
-        nonlocal login_message, message_color
+    def try_register():
+        nonlocal is_loading
+        if len(password) < 6:
+            trigger_toast("Senha deve ter 6+ dígitos.", ERROR_COLOR, True)
+            return
+
+        is_loading = True
+        draw_frame()
+
         try:
-            user = auth.create_user_with_email_and_password(email_input, password_input)
-            login_message = "Registrado! Faça o login."
-            message_color = SUCCESS_COLOR
+            auth.create_user_with_email_and_password(email, password)
+            trigger_toast("Conta criada! Faça login agora.", SUCCESS_COLOR)
         except Exception as e:
-            message_color = ERROR_COLOR
-            try:
-                error_info = e.args[1]
-                if "EMAIL_EXISTS" in error_info:
-                    login_message = "Email já cadastrado."
-                elif "WEAK_PASSWORD" in error_info:
-                    login_message = "Senha fraca (mín. 6 chars)."
-                else:
-                    login_message = "Erro no registro."
-            except (IndexError, TypeError, KeyError):
-                login_message = "Erro no registro."
+            err = str(e)
+            if "EMAIL_EXISTS" in err:
+                trigger_toast("Este email já existe.", ERROR_COLOR, True)
+            elif "INVALID_EMAIL" in err:
+                trigger_toast("Email inválido.", ERROR_COLOR, True)
+            else:
+                trigger_toast("Erro ao registrar.", ERROR_COLOR, True)
+            print(e)
+        finally:
+            is_loading = False
 
-    login_button = Button(
-        "Login",
-        (email_rect.left, 410, button_width, button_height),
-        do_login,
-        font_small,
-        PRIMARY_COLOR,
-        PRIMARY_HOVER,
-    )
+    btn_login = Button("ENTRAR", (panel_rect.x + 50, panel_rect.y + 340, 160, 50), try_login, font_small, PRIMARY_COLOR, PRIMARY_HOVER, border_radius=25)
+    btn_reg = Button("CRIAR CONTA", (panel_rect.right - 210, panel_rect.y + 340, 160, 50), try_register, font_small, SECONDARY_COLOR, SECONDARY_HOVER, border_radius=25)
 
-    register_button = Button(
-        "Registrar",
-        (email_rect.right - button_width, 410, button_width, button_height),
-        do_register,
-        font_small,
-        SECONDARY_COLOR,
-        SECONDARY_HOVER,
-    )
+    def go_menu():
+        nonlocal game_state
+        game_state = "MENU"
 
-    login_buttons = [login_button, register_button]
-
-    def go_to_score_menu():
+    def go_score():
         nonlocal game_state
         game_state = "SCORE_MENU"
 
-    def go_to_main_menu():
-        nonlocal game_state
-        game_state = "MENU"
+    btns_menu = []
 
-    BTN_W = 260
-    BTN_H = 65
-    GAP_X = 30
-    GAP_Y = 30
-    START_Y = 200
-
-    TOTAL_GRID_WIDTH = (4 * BTN_W) + (3 * GAP_X)
-    START_X = (SCREEN_WIDTH - TOTAL_GRID_WIDTH) // 2
-
-    def get_pos(col, row):
-        x = START_X + (col * (BTN_W + GAP_X))
-        y = START_Y + (row * (BTN_H + GAP_Y))
-        return (x, y, BTN_W, BTN_H)
-
-    game_buttons = [
-        # --- LINHA 1 ---
-        Button("Tower Defense", get_pos(0, 0), run_tower_defense, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Snake", get_pos(1, 0), run_snake, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Ping Pong", get_pos(2, 0), run_ping_pong, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Jogo da Velha", get_pos(3, 0), run_tic_tac_toe, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # --- LINHA 2 ---
-        Button("Space Invaders", get_pos(0, 1), run_space_invaders, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Flappy Bird", get_pos(1, 1), run_flappy_bird, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Pac-Man", get_pos(2, 1), run_pacman, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Cookie Clicker", get_pos(3, 1), run_cookie_clicker, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # --- LINHA 3 ---
-        Button("Jogo da Memória", get_pos(0, 2), run_memory_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("2048", get_pos(1, 2), run_doisK_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Quiz", get_pos(2, 2), run_quiz_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Evade", get_pos(3, 2), run_evade_game, font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # --- SCOREBOARD (Centralizado abaixo de tudo) ---
-        Button("Ver Scoreboards", (SCREEN_WIDTH // 2 - 150, START_Y + (3 * (BTN_H + GAP_Y)) + 10, 300, 60), go_to_score_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
+    games_data = [
+        ("Tower Defense", lambda: run_game(tower_defense_game, "tower_defense_game")),
+        ("Snake", lambda: run_game(snake_game, "snake_game")),
+        ("Ping Pong", lambda: run_game(ping_pong_game, "ping_pong")),
+        ("Jogo da Velha", lambda: run_game(tic_tac_toe_game, "tic_tac_toe")),
+        ("Space Invaders", lambda: run_game(space_invaders_game, "space_invaders_game")),
+        ("Flappy Bird", lambda: run_game(flappy_bird_game, "flappy_bird_game")),
+        ("Pac-Man", lambda: run_game(pacman_game, "pacman_game")),
+        ("Cookie Clicker", lambda: run_game(cookie_clicker_game, "cookie_clicker_game")),
+        ("Memória", lambda: run_game(memory_game, "memory_game")),
+        ("2048", lambda: run_game(doisK_game, "doisK_game")),
+        ("Quiz", lambda: run_game(quiz_game, "quiz_game")),
+        ("Evade", lambda: run_game(evade_game, "evade_game")),
     ]
 
-    score_menu_buttons = [
-        # Linha 1
-        Button("Snake", get_pos(0, 0), lambda: show_scoreboard("snake_game", "Snake"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Tower Defense", get_pos(1, 0), lambda: show_scoreboard("tower_defense_game", "Tower Defense"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Space Invaders", get_pos(2, 0), lambda: show_scoreboard("space_invaders_game", "Space Invaders"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Flappy Bird", get_pos(3, 0), lambda: show_scoreboard("flappy_bird_game", "Flappy Bird"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # Linha 2
-        Button("Pac-Man", get_pos(0, 1), lambda: show_scoreboard("pacman_game", "Pac-Man"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Cookie Clicker", get_pos(1, 1), lambda: show_scoreboard("cookie_clicker_game", "Cookie Clicker"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Jogo da Memória", get_pos(2, 1), lambda: show_scoreboard("memory_game", "Jogo da Memória"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("2048", get_pos(3, 1), lambda: show_scoreboard("2048_game", "2048"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # Linha 3 (Centralizada com 2 itens)
-        Button("Quiz", get_pos(1, 2), lambda: show_scoreboard("quiz_game", "Quiz"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        Button("Evade", get_pos(2, 2), lambda: show_scoreboard("evade_game", "Evade"), font_small, PRIMARY_COLOR, PRIMARY_HOVER),
-        # Voltar
-        Button("Voltar ao Menu", (SCREEN_WIDTH // 2 - 150, START_Y + (3 * (BTN_H + GAP_Y)) + 10, 300, 60), go_to_main_menu, font_small, SECONDARY_COLOR, SECONDARY_HOVER),
-    ]
+    bx, by = (SCREEN_WIDTH - (4 * 260 + 3 * 30)) // 2, 200
+
+    for i, (name, cb) in enumerate(games_data):
+        c, r = i % 4, i // 4
+        btns_menu.append(Button(name, (bx + c * 290, by + r * 95, 260, 65), cb, font_small, PRIMARY_COLOR, PRIMARY_HOVER))
+
+    btns_menu.append(Button("RANKINGS", (SCREEN_WIDTH // 2 - 150, by + 3 * 95 + 20, 300, 60), go_score, font_medium, SECONDARY_COLOR, SECONDARY_HOVER, border_radius=30))
+
+    btns_score = []
+
+    score_data = [("Tower Defense", "tower_defense_game"), ("Snake", "snake_game"), ("Ping Pong", "ping_pong"), ("Jogo da Velha", "tic_tac_toe"), ("Space Invaders", "space_invaders_game"), ("Flappy Bird", "flappy_bird_game"), ("Pac-Man", "pacman_game"), ("Cookie Clicker", "cookie_clicker_game"), ("Memória", "memory_game"), ("2048", "doisK_game"), ("Quiz", "quiz_game"), ("Evade", "evade_game")]
+
+    for i, (title, db_id) in enumerate(score_data):
+        c, r = i % 4, i // 4
+        btns_score.append(Button(title, (bx + c * 290, by + r * 95, 260, 65), lambda d=db_id, t=title: show_scoreboard(d, t), font_small, PRIMARY_COLOR, PRIMARY_HOVER))
+
+    btns_score.append(Button("Voltar", (SCREEN_WIDTH // 2 - 150, by + 3 * 95 + 20, 300, 60), go_menu, font_medium, SECONDARY_COLOR, SECONDARY_HOVER, border_radius=30))
+
+    def draw_frame():
+        screen.fill(BG_COLOR)
+        draw_grid(screen, bg_offset)
+
+        if game_state == "LOGIN":
+            draw_panel(screen, panel_rect)
+            draw_text("HUB DE JOGOS", font_title, PRIMARY_COLOR, screen, SCREEN_WIDTH / 2, panel_rect.y + 50, center=True)
+            draw_text("Acesso Restrito", font_medium, SECONDARY_HOVER, screen, SCREEN_WIDTH / 2, panel_rect.y + 90, center=True)
+
+            draw_text("Email", font_small, TEXT_COLOR, screen, email_rect.x, email_rect.y - 25)
+            draw_text("Senha", font_small, TEXT_COLOR, screen, pass_rect.x, pass_rect.y - 25)
+
+            bc_email = ERROR_COLOR if input_error else (FOCUS_COLOR if active_field == "email" else SECONDARY_COLOR)
+            bc_pass = ERROR_COLOR if input_error else (FOCUS_COLOR if active_field == "pass" else SECONDARY_COLOR)
+
+            pygame.draw.rect(screen, INPUT_BG, email_rect, border_radius=6)
+            pygame.draw.rect(screen, bc_email, email_rect, 2 if active_field == "email" or input_error else 1, border_radius=6)
+
+            pygame.draw.rect(screen, INPUT_BG, pass_rect, border_radius=6)
+            pygame.draw.rect(screen, bc_pass, pass_rect, 2 if active_field == "pass" or input_error else 1, border_radius=6)
+
+            screen.set_clip(email_rect.inflate(-10, -10))
+            draw_text(email + ("|" if active_field == "email" and (pygame.time.get_ticks() // 500) % 2 == 0 else ""), font_small, WHITE, screen, email_rect.x + 10, email_rect.centery, v_center=True)
+            screen.set_clip(None)
+
+            screen.set_clip(pass_rect.inflate(-10, -10))
+            display_pass = "•" * len(password)
+            draw_text(display_pass + ("|" if active_field == "pass" and (pygame.time.get_ticks() // 500) % 2 == 0 else ""), font_medium, WHITE, screen, pass_rect.x + 10, pass_rect.centery + 2, v_center=True)
+            screen.set_clip(None)
+
+            if is_loading:
+                r = btn_login.rect
+                pygame.draw.rect(screen, SECONDARY_COLOR, r, border_radius=25)
+                draw_text("Conectando...", font_small, WHITE, screen, r.centerx, r.centery, center=True)
+            else:
+                btn_login.draw(screen)
+                btn_reg.draw(screen)
+
+            draw_toast()
+
+        elif game_state == "MENU":
+            draw_text("HUB PRINCIPAL", font_title, WHITE, screen, SCREEN_WIDTH / 2, 80, center=True)
+            draw_text(f"Usuário: {user_info.get('email','Guest')}", font_small, PRIMARY_COLOR, screen, SCREEN_WIDTH / 2, 130, center=True)
+            for b in btns_menu:
+                b.draw(screen)
+            if cheats_enabled:
+                draw_text("CHEATS ON", font_small, SUCCESS_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, center=True)
+
+        elif game_state == "SCORE_MENU":
+            draw_text("SELECIONE O JOGO", font_title, WHITE, screen, SCREEN_WIDTH / 2, 100, center=True)
+            for b in btns_score:
+                b.draw(screen)
+
+        pygame.display.flip()
 
     running = True
     while running:
+        bg_offset += 0.5
+
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
 
+            if is_loading:
+                continue
+            if event.type == pygame.KEYDOWN:
+                key_seq.append(event.key)
+                key_seq = key_seq[-10:]
+
+                if key_seq == KONAMI:
+                    cheats_enabled = not cheats_enabled
+                    trigger_toast(f"Cheats: {'ATIVADOS' if cheats_enabled else 'DESATIVADOS'}", SUCCESS_COLOR if cheats_enabled else ERROR_COLOR)
+
+                if game_state == "LOGIN" and key_seq[-len(SECRET) :] == SECRET:
+                    email, password = "ianrtaniguchi@gmail.com", "girafa37"
+                    try_login()
+
             if game_state == "LOGIN":
-                for btn in login_buttons:
-                    btn.handle_event(event)
+                btn_login.handle_event(event)
+                btn_reg.handle_event(event)
+
                 if event.type == pygame.MOUSEBUTTONDOWN:
-                    login_message = ""
+                    input_error = False
                     if email_rect.collidepoint(event.pos):
                         active_field = "email"
-                    elif password_rect.collidepoint(event.pos):
-                        active_field = "password"
+                    elif pass_rect.collidepoint(event.pos):
+                        active_field = "pass"
                     else:
                         active_field = None
+
                 if event.type == pygame.KEYDOWN:
-                    key_sequence.append(event.key)
-                    key_sequence = key_sequence[-len(KONAMI_CODE) :]
-                    if key_sequence == KONAMI_CODE:
-                        cheats_enabled = not cheats_enabled
-                        login_message = "CHEATS ATIVADOS!" if cheats_enabled else "CHEATS DESATIVADOS"
-                        message_color = SUCCESS_COLOR if cheats_enabled else ERROR_COLOR
-
-                    if event.key == pygame.K_RETURN:
+                    if event.key == pygame.K_TAB:
+                        active_field = "pass" if active_field == "email" else "email"
+                    elif event.key == pygame.K_RETURN:
                         if active_field == "email":
-                            active_field = "password"
-                        elif active_field == "password":
-                            do_login()
-
-                    if active_field == "email":
+                            active_field = "pass"
+                        else:
+                            try_login()
+                    elif active_field == "email":
                         if event.key == pygame.K_BACKSPACE:
-                            email_input = email_input[:-1]
-                        elif event.key != pygame.K_TAB:
-                            email_input += event.unicode
-                    elif active_field == "password":
+                            email = email[:-1]
+                        else:
+                            email += event.unicode
+                    elif active_field == "pass":
                         if event.key == pygame.K_BACKSPACE:
-                            password_input = password_input[:-1]
-                        elif event.key != pygame.K_TAB:
-                            password_input += event.unicode
+                            password = password[:-1]
+                        else:
+                            password += event.unicode
 
             elif game_state == "MENU":
-                for button in game_buttons:
-                    button.handle_event(event)
-                if event.type == pygame.KEYDOWN:
-                    key_sequence.append(event.key)
-                    key_sequence = key_sequence[-len(KONAMI_CODE) :]
-                    if key_sequence == KONAMI_CODE:
-                        cheats_enabled = not cheats_enabled
-
+                for b in btns_menu:
+                    b.handle_event(event)
             elif game_state == "SCORE_MENU":
-                for button in score_menu_buttons:
-                    button.handle_event(event)
+                for b in btns_score:
+                    b.handle_event(event)
 
-        screen.fill(BG_COLOR)
-
-        if game_state == "LOGIN":
-            draw_text("HUB DE JOGOS - LOGIN", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 150, center=True)
-            draw_text("Email:", font_small, TEXT_COLOR, screen, email_rect.left, email_rect.top - 28, center=False)
-            border_color_email = FOCUS_COLOR if active_field == "email" else TEXT_COLOR
-            pygame.draw.rect(screen, INPUT_BG, email_rect, border_radius=8)
-            pygame.draw.rect(screen, border_color_email, email_rect, 2, border_radius=8)
-            draw_text(email_input, font_small, TEXT_COLOR, screen, email_rect.left + 15, email_rect.centery, v_center=True)
-            draw_text("Senha:", font_small, TEXT_COLOR, screen, password_rect.left, password_rect.top - 28, center=False)
-            border_color_pass = FOCUS_COLOR if active_field == "password" else TEXT_COLOR
-            pygame.draw.rect(screen, INPUT_BG, password_rect, border_radius=8)
-            pygame.draw.rect(screen, border_color_pass, password_rect, 2, border_radius=8)
-            draw_text("*" * len(password_input), font_small, TEXT_COLOR, screen, password_rect.left + 15, password_rect.centery, v_center=True)
-            for btn in login_buttons:
-                btn.draw(screen)
-            draw_text(login_message, font_small, message_color, screen, SCREEN_WIDTH / 2, 480, center=True)
-
-        elif game_state == "MENU":
-            draw_text("HUB DE JOGOS", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 100, center=True)
-            for button in game_buttons:
-                button.draw(screen)
-            if cheats_enabled:
-                draw_text("CHEATS ATIVADOS", font_small, SUCCESS_COLOR, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT - 30, center=True)
-
-        elif game_state == "SCORE_MENU":
-            draw_text("SCOREBOARDS", font_large, TEXT_COLOR, screen, SCREEN_WIDTH / 2, 100, center=True)
-            for button in score_menu_buttons:
-                button.draw(screen)
-
-        pygame.display.flip()
+        draw_frame()
         clock.tick(60)
 
     pygame.quit()
