@@ -130,6 +130,8 @@ def load_sound(filename, volume=0.20):  # Tenta carregar um som, se falhar, reto
 
 # Carregamento em si das midias
 try:
+    print(f"Tentando carregar mapa de: {str(IMAGES_DIR / 'map.png')}")
+
     background_image = pygame.image.load(str(IMAGES_DIR / "map.png")).convert()
 except pygame.error as e:
     print(f"Erro CRÍTICO ao carregar 'map.png': {e}")
@@ -202,34 +204,23 @@ ost_cheats = load_sound("tower_defense_fx/OST/Ligeiro-OST_1_.wav")
 
 # Definição do Caminho (Waypoints)
 WAYPOINTS = [  # esses waypoints definem o caminho que os inimigos vão seguir, são coordenadas x,y que podem ser mudadas, mas dependem do mapa para fazer sentido visual
-    (-100, 300),
-    (300, 300),
-    (300, 490),
-    (980, 490),
-    (980, 190),
-    (1380, 190),  # Ponto final (fora da tela)
+    (-100, 150),
+    (300, 150),
+    (300, 400),
+    (1000, 400),
+    (1000, 200),
+    (1380, 200),  # Ponto final (fora da tela)
 ]
 
 # Locais de construção das torres, necessário alterar conforme o mapa (Del Pupo)
 TOWER_SLOTS = [
-    (63, 180),
-    (237, 180),
-    (74, 380),
-    (214, 420),
-    (410, 300),
-    (390, 560),
-    (570, 560),
-    (730, 560),
-    (935, 560),
-    (580, 365),
-    (730, 365),
-    (885, 185),
-    (885, 340),
-    (1090, 395),
-    (1100, 75),
-    (1230, 75),
-    (1100, 270),
-    (1230, 270),
+    (200, 250),
+    (400, 250),
+    (200, 350),
+    (500, 500),
+    (700, 500),
+    (900, 500),
+    (900, 300),
 ]
 
 TORRE_SLOT_RECTS = [pygame.Rect(pos[0] - 24, pos[1] - 24, 48, 48) for pos in TOWER_SLOTS]  # cria os rects para cada slot, que detecta a colisão do mouse os pos sao para centralizar o rect, 24 metade dos 48 pixels, deve ser alterado se mudar o tamanho das torres

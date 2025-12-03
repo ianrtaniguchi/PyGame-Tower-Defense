@@ -7,7 +7,9 @@ import sys
 from pygame.locals import *
 
 
+# Função principal que o hub vai chamar
 def main(screen, clock, cheats_enabled):
+
     # Usa o relógio e a tela passados pelo hub
     relogio = clock
     tela = screen
@@ -16,126 +18,103 @@ def main(screen, clock, cheats_enabled):
     larg = tela.get_width()
     alt = tela.get_height()
 
-    BG_COLOR = (20, 20, 30)
-    LINE_COLOR = (50, 50, 65)
-    BALL_COLOR = (255, 255, 255)
-    P1_COLOR = (255, 50, 100)
-    P2_COLOR = (0, 200, 255)
-    TEXT_COLOR = (200, 200, 200)
-    CHEAT_COLOR = (0, 255, 100)
-
-    paddle_margin = 20
-    p1_x = paddle_margin
-    p2_x = larg - paddle_margin - 10
-
-    raquete_larg = 12
-    raquete_alt = 100
-    p1_y = alt // 2 - raquete_alt // 2
-    p2_y = alt // 2 - raquete_alt // 2
-
+    # Posições iniciais (ajustei p2_x para usar 'larg')
+    p1_x = 10
+    p1_y = 10
+    p2_x = larg - 20
+    p2_y = 350
     b_x = larg // 2
     b_y = alt // 2
-    bola_radius = 8
-    bdx = 5
-    bdy = 5
-
-    ball_trail = []
-    TRAIL_LENGTH = 15
-
-    velocidade_raquete = 8
+    bdx = 4
+    bdy = 4
+    raquete_larg = 10
+    raquete_alt = 100
+    velocidade_raquete = 7
 
     score_p1 = 0
     score_p2 = 0
 
-    try:
-        font_score = pygame.font.SysFont("Arial", 60, bold=True)
-        font_cheat = pygame.font.SysFont("Arial", 20)
-    except:
-        font_score = pygame.font.Font(None, 74)
-        font_cheat = pygame.font.Font(None, 24)
+    font = pygame.font.SysFont(None, 40)
+
+    # Cores
+    PRETO = (0, 0, 0)
+    BRANCO = (255, 255, 255)
+    VERMELHO = (255, 0, 0)
+    AMARELO = (255, 255, 0)
+    AZUL = (0, 0, 255)
+    VERDE = (0, 255, 0)
 
     p1_altura_cheat = alt if cheats_enabled else raquete_alt
     p1_velocidade_cheat = 0 if cheats_enabled else velocidade_raquete
 
+    # Função de reset adaptada: ela retorna os novos valores
     def reset_bola(direcao):
-        return larg // 2, alt // 2, 5 * direcao, 5
-
-    def draw_dashed_line(surface, color, start_pos, end_pos, width=1, dash_length=10):
-        x1, y1 = start_pos
-        x2, y2 = end_pos
-        dl = dash_length
-
-        if x1 == x2:
-            ycoords = [y for y in range(y1, y2, dl if dl > 0 else 1)]
-            for i, y in enumerate(ycoords):
-                if i % 2 == 0:
-                    pygame.draw.line(surface, color, (x1, y), (x1, y + dl), width)
+        new_b_x = larg // 2
+        new_b_y = alt // 2
+        new_bdx = 4 * direcao
+        new_bdy = 4
+        return new_b_x, new_b_y, new_bdx, new_bdy
 
     # Loop principal do jogo
     running = True
     while running:
-        relogio.tick(60)  # 60 FPS estável é melhor para física que 100
-        tela.fill(BG_COLOR)
+        relogio.tick(100)
+        tela.fill(PRETO)
 
         # Eventos
         for event in pygame.event.get():
             if event.type == QUIT:
-                running = False
+                running = False  # Sai do loop do jogo
             if event.type == KEYDOWN:
-                if event.key == K_ESCAPE:
+                if event.key == K_ESCAPE:  # Adiciona tecla ESC para sair
                     running = False
 
         if cheats_enabled:
             p1_y = 0
 
-        # Atualiza posição da bola
-        b_x += bdx
-        b_y += bdy
+        # Desenhar raquetes
+        p1 = pygame.draw.rect(tela, VERMELHO, (p1_x, p1_y, raquete_larg, p1_altura_cheat))
+        p2 = pygame.draw.rect(tela, AMARELO, (p2_x, p2_y, raquete_larg, raquete_alt))
 
-        ball_trail.append((b_x, b_y))
-        if len(ball_trail) > TRAIL_LENGTH:
-            ball_trail.pop(0)
+        # Desenhar a bola
+        bola = pygame.draw.circle(tela, AZUL, (b_x, b_y), 10)
+
+        # Atualiza posição da bola
+        b_x = b_x + bdx
+        b_y = b_y + bdy
 
         # Rebote nas paredes superior/inferior
-        if b_y - bola_radius <= 0 or b_y + bola_radius >= alt:
+        if b_y - 10 <= 0 or b_y + 10 >= alt:
             bdy *= -1
 
-        # Retângulos de colisão
-        bola_rect = pygame.Rect(b_x - bola_radius, b_y - bola_radius, bola_radius * 2, bola_radius * 2)
+        # Verifica colisão com as raquetes
+        bola_rect = pygame.Rect(b_x - 10, b_y - 10, 20, 20)
         p1_rect = pygame.Rect(p1_x, p1_y, raquete_larg, p1_altura_cheat)
         p2_rect = pygame.Rect(p2_x, p2_y, raquete_larg, raquete_alt)
 
-        # Colisão P1
+        # Colisão com raquete esquerda
         if bola_rect.colliderect(p1_rect):
-            bdx = abs(bdx) * 1.05  # Aumenta um pouco a velocidade a cada batida
+            bdx = abs(bdx)
             offset = (b_y - (p1_y + p1_altura_cheat / 2)) / (p1_altura_cheat / 2)
-            bdy = int(8 * offset)  # Mais ângulo
+            bdy = int(6 * offset)
             if bdy == 0:
-                bdy = 1
+                bdy = 1  # Evita que a bola fique reta
 
-        # Colisão P2
+        # Colisão com raquete direita
         if bola_rect.colliderect(p2_rect):
-            bdx = -abs(bdx) * 1.05
+            bdx = -abs(bdx)
             offset = (b_y - (p2_y + raquete_alt / 2)) / (raquete_alt / 2)
-            bdy = int(8 * offset)
+            bdy = int(6 * offset)
             if bdy == 0:
-                bdy = 1
-
-        # Limitar velocidade máxima para não quebrar a física
-        if bdx > 15:
-            bdx = 15
-        if bdx < -15:
-            bdx = -15
+                bdy = 1  # Evita que a bola fique reta
 
         # Marcação de ponto
         if b_x < 0:
             score_p2 += 1
-            b_x, b_y, bdx, bdy = reset_bola(1)
-            ball_trail.clear()
+            b_x, b_y, bdx, bdy = reset_bola(1)  # Recebe os novos valores
         elif b_x > larg:
             score_p1 += 1
-            b_x, b_y, bdx, bdy = reset_bola(-1)
-            ball_trail.clear()
+            b_x, b_y, bdx, bdy = reset_bola(-1)  # Recebe os novos valores
 
         # Controles
         keys = pygame.key.get_pressed()
@@ -148,27 +127,14 @@ def main(screen, clock, cheats_enabled):
         if keys[pygame.K_DOWN] and p2_y + raquete_alt < alt:
             p2_y += velocidade_raquete
 
-        draw_dashed_line(tela, LINE_COLOR, (larg // 2, 0), (larg // 2, alt), width=4, dash_length=20)
-
-        p1_score_surf = font_score.render(str(score_p1), True, LINE_COLOR)  # Cor discreta
-        p2_score_surf = font_score.render(str(score_p2), True, LINE_COLOR)
-        tela.blit(p1_score_surf, (larg // 4, 50))
-        tela.blit(p2_score_surf, (larg * 3 // 4, 50))
-
-        pygame.draw.rect(tela, P1_COLOR, p1_rect, border_radius=6)
-        pygame.draw.rect(tela, P2_COLOR, p2_rect, border_radius=6)
-
-        for i, pos in enumerate(ball_trail):  # rastro
-            alpha = int((i / len(ball_trail)) * 255)
-            radius = int(bola_radius * (i / len(ball_trail)))
-            trail_surf = pygame.Surface((radius * 2, radius * 2), pygame.SRCALPHA)
-            pygame.draw.circle(trail_surf, (*BALL_COLOR, alpha // 2), (radius, radius), radius)
-            tela.blit(trail_surf, (pos[0] - radius, pos[1] - radius))
-
-        pygame.draw.circle(tela, BALL_COLOR, (int(b_x), int(b_y)), bola_radius)
+        # Desenhar o placar (antes do update!)
+        score_text = f"{score_p1}  -  {score_p2}"
+        score_surf = font.render(score_text, True, BRANCO)
+        score_rect = score_surf.get_rect(center=(larg // 2, 30))
+        tela.blit(score_surf, score_rect)
 
         if cheats_enabled:
-            cheat_surf = font_cheat.render("CHEATS ON: Raquete Gigante", True, CHEAT_COLOR)
-            tela.blit(cheat_surf, (10, alt - 30))
+            draw_text("CHEATS ATIVADOS", font, VERDE, tela, 100, 30, center=True)
 
+        # Atualiza a tela (apenas uma vez, no final)
         pygame.display.flip()
