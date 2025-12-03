@@ -1,3 +1,5 @@
+# Pacman PRONTO
+# Codigo feito por Ian Riki Taniguchi
 import pygame
 import sys
 import random
@@ -40,17 +42,17 @@ def main(screen, clock, cheats_enabled):
         "1111112111110110111112111111",
         "0000012110000000000112100000",
         "1111112110111111110112111111",
-        "1222222000100000010002222221",
+        "2222222000100000010002222222",
         "1111112110111111110112111111",
         "0000012110000000000112100000",
         "1111112110111111110112111111",
         "1222222222222112222222222221",
         "1211112111112112111112111121",
-        "1222112222222222222221122221",
+        "1222112222222222222222112221",
         "1112112112111111112112112111",
         "1222222112222112222112222221",
         "1111111111111111111111111111",
-    ]  # 0: caminho, 1: parede
+    ]
 
     class Player(pygame.sprite.Sprite):
         def __init__(self, x, y):
@@ -66,30 +68,34 @@ def main(screen, clock, cheats_enabled):
             self.next_direction = (0, 0)
             self.speed = 3
 
-        def update(self, walls):
-            new_rect = self.rect.copy()
-
-            if self.rect.x % CELL_SIZE == 2 and self.rect.y % CELL_SIZE == 2:
+        def update(self):
+            if (self.rect.x - MAP_OFFSET_X) % CELL_SIZE == 2 and (self.rect.y - MAP_OFFSET_Y) % CELL_SIZE == 2:
                 self.grid_x = (self.rect.x - MAP_OFFSET_X) // CELL_SIZE
                 self.grid_y = (self.rect.y - MAP_OFFSET_Y) // CELL_SIZE
 
-                next_x = self.grid_x + self.next_direction[0]
-                next_y = self.grid_y + self.next_direction[1]
+                if self.next_direction != (0, 0):
+                    nx = self.grid_x + self.next_direction[0]
+                    ny = self.grid_y + self.next_direction[1]
+                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                        if MAP[ny][nx] != "1":
+                            self.direction = self.next_direction
+                    elif nx < 0 or nx >= GRID_WIDTH:
+                        self.direction = self.next_direction
 
-                if next_x >= 0 and next_x < GRID_WIDTH and next_y >= 0 and next_y < GRID_HEIGHT and MAP[next_y][next_x] != "1":
-                    self.direction = self.next_direction
+                nx = self.grid_x + self.direction[0]
+                ny = self.grid_y + self.direction[1]
 
-            new_rect.x += self.direction[0] * self.speed
-            new_rect.y += self.direction[1] * self.speed
+                if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                    if MAP[ny][nx] == "1":
+                        self.direction = (0, 0)
 
-            if new_rect.x % CELL_SIZE == 2 and new_rect.y % CELL_SIZE == 2:
-                next_x = self.grid_x + self.direction[0]
-                next_y = self.grid_y + self.direction[1]
+            self.rect.x += self.direction[0] * self.speed
+            self.rect.y += self.direction[1] * self.speed
 
-                if next_x < 0 or next_x >= GRID_WIDTH or next_y < 0 or next_y >= GRID_HEIGHT or MAP[next_y][next_x] == "1":
-                    self.direction = (0, 0)
-
-            self.rect = new_rect
+            if self.rect.right <= MAP_OFFSET_X:
+                self.rect.x = MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE) - self.rect.width
+            elif self.rect.left >= MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE):
+                self.rect.x = MAP_OFFSET_X
 
         def set_direction(self, dx, dy):
             self.next_direction = (dx, dy)
@@ -104,53 +110,51 @@ def main(screen, clock, cheats_enabled):
             self.grid_y = y
             self.direction = (0, 0)
             self.speed = 2
-            self.last_move = 0
 
         def update(self, player_grid_pos):
-            if pygame.time.get_ticks() - self.last_move < 200:
-                self.rect.x += self.direction[0] * self.speed
-                self.rect.y += self.direction[1] * self.speed
-                return
-
-            self.last_move = pygame.time.get_ticks()
-            self.grid_x = (self.rect.x - MAP_OFFSET_X) // CELL_SIZE
-            self.grid_y = (self.rect.y - MAP_OFFSET_Y) // CELL_SIZE
-
-            possible_moves = []
-            for dx, dy in [(0, 1), (0, -1), (1, 0), (-1, 0)]:
-                if (dx, dy) == (-self.direction[0], -self.direction[1]):
-                    continue
-                next_x = self.grid_x + dx
-                next_y = self.grid_y + dy
-                if next_x >= 0 and next_x < GRID_WIDTH and next_y >= 0 and next_y < GRID_HEIGHT and MAP[next_y][next_x] != "1":
-                    possible_moves.append((dx, dy))
-
-            if not possible_moves:
-                self.direction = (-self.direction[0], -self.direction[1])
-            else:
-                best_move = possible_moves[0]
-                min_dist = float("inf")
-
-                for move in possible_moves:
-                    dist = abs(self.grid_x + move[0] - player_grid_pos[0]) + abs(self.grid_y + move[1] - player_grid_pos[1])
-                    if dist < min_dist:
-                        min_dist = dist
-                        best_move = move
-
-                self.direction = best_move
-
-            self.rect.x = MAP_OFFSET_X + self.grid_x * CELL_SIZE + 2
-            self.rect.y = MAP_OFFSET_Y + self.grid_y * CELL_SIZE + 2
             self.rect.x += self.direction[0] * self.speed
             self.rect.y += self.direction[1] * self.speed
+
+            if (self.rect.x - MAP_OFFSET_X) % CELL_SIZE == 2 and (self.rect.y - MAP_OFFSET_Y) % CELL_SIZE == 2:
+                self.grid_x = (self.rect.x - MAP_OFFSET_X) // CELL_SIZE
+                self.grid_y = (self.rect.y - MAP_OFFSET_Y) // CELL_SIZE
+
+                possible_moves = []
+                for dx, dy in [(0, -1), (0, 1), (-1, 0), (1, 0)]:
+                    if (dx, dy) == (-self.direction[0], -self.direction[1]) and self.direction != (0, 0):
+                        continue
+
+                    nx, ny = self.grid_x + dx, self.grid_y + dy
+
+                    if 0 <= nx < GRID_WIDTH and 0 <= ny < GRID_HEIGHT:
+                        if MAP[ny][nx] != "1":
+                            possible_moves.append((dx, dy))
+                    elif nx < 0 or nx >= GRID_WIDTH:
+                        possible_moves.append((dx, dy))
+
+                if not possible_moves:
+                    possible_moves.append((-self.direction[0], -self.direction[1]))
+
+                if possible_moves:
+                    best_move = min(possible_moves, key=lambda m: abs((self.grid_x + m[0]) - player_grid_pos[0]) + abs((self.grid_y + m[1]) - player_grid_pos[1]))  # algoritmo de busca gulosa usando distância de Manhattan
+
+                    if random.random() < 0.1:
+                        self.direction = random.choice(possible_moves)
+                    else:
+                        self.direction = best_move
+                else:
+                    self.direction = (0, 0)
+
+            if self.rect.right <= MAP_OFFSET_X:
+                self.rect.x = MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE) - self.rect.width
+            elif self.rect.left >= MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE):
+                self.rect.x = MAP_OFFSET_X
 
     class Pellet(pygame.sprite.Sprite):
         def __init__(self, x, y):
             super().__init__()
             self.image = pygame.Surface((CELL_SIZE // 4, CELL_SIZE // 4))
             self.image.fill(WHITE)
-            pygame.draw.circle(self.image, BLACK, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 8)
-            pygame.draw.circle(self.image, WHITE, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 8 - 1)
             self.rect = self.image.get_rect(center=(MAP_OFFSET_X + x * CELL_SIZE + CELL_SIZE // 2, MAP_OFFSET_Y + y * CELL_SIZE + CELL_SIZE // 2))
 
     def draw_text(text, font, color, surface, x, y, center=True):
@@ -162,36 +166,32 @@ def main(screen, clock, cheats_enabled):
             text_rect.topleft = (x, y)
         surface.blit(text_obj, text_rect)
 
-    def draw_map(surface, walls):
+    def draw_map(surface):
         for y, row in enumerate(MAP):
             for x, char in enumerate(row):
                 if char == "1":
                     wall_rect = pygame.Rect(MAP_OFFSET_X + x * CELL_SIZE, MAP_OFFSET_Y + y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
                     pygame.draw.rect(surface, BLUE, wall_rect)
-                    walls.append(wall_rect)
 
     def game_loop():
         all_sprites = pygame.sprite.Group()
         ghosts = pygame.sprite.Group()
         pellets = pygame.sprite.Group()
-        walls = []
 
         player = Player(1, 1)
         all_sprites.add(player)
 
         ghost_list = [Ghost(12, 8, RED), Ghost(13, 8, GREEN), Ghost(14, 8, PINK), Ghost(15, 8, ORANGE)]
+
         for g in ghost_list:
             all_sprites.add(g)
             ghosts.add(g)
 
-        total_pellets = 0
         for y, row in enumerate(MAP):
             for x, char in enumerate(row):
                 if char == "2":
                     p = Pellet(x, y)
-                    all_sprites.add(p)
                     pellets.add(p)
-                    total_pellets += 1
 
         score = 0
         running = True
@@ -208,56 +208,62 @@ def main(screen, clock, cheats_enabled):
                         running = False
                     if game_over or game_won:
                         if event.key == pygame.K_SPACE:
-                            game_loop()
-                            return
-                    if event.key == pygame.K_UP:
-                        player.set_direction(0, -1)
-                    if event.key == pygame.K_DOWN:
-                        player.set_direction(0, 1)
-                    if event.key == pygame.K_LEFT:
-                        player.set_direction(-1, 0)
-                    if event.key == pygame.K_RIGHT:
-                        player.set_direction(1, 0)
+                            return game_loop()
 
-            if game_over or game_won:
-                screen.fill(BLACK)
-                message = "VOCÊ VENCEU!" if game_won else "GAME OVER"
-                color = YELLOW if game_won else RED
-                draw_text(message, font_large, color, screen, WIDTH / 2, HEIGHT / 2 - 40)
-                draw_text(f"Pontuação: {score}", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 20)
-                draw_text("Pressione [ESPAÇO] para reiniciar ou [ESC] para sair", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
-                pygame.display.flip()
-                clock.tick(60)
-                continue
+                    if not game_over and not game_won:
+                        if event.key == pygame.K_UP:
+                            player.set_direction(0, -1)
+                        elif event.key == pygame.K_DOWN:
+                            player.set_direction(0, 1)
+                        elif event.key == pygame.K_LEFT:
+                            player.set_direction(-1, 0)
+                        elif event.key == pygame.K_RIGHT:
+                            player.set_direction(1, 0)
 
-            player.update(walls)
-            for ghost in ghosts:
-                ghost.update((player.grid_x, player.grid_y))
+            if not game_over and not game_won:
+                player.update()
+                for ghost in ghosts:
+                    ghost.update((player.grid_x, player.grid_y))
 
-            eaten_pellets = pygame.sprite.spritecollide(player, pellets, True)
-            if eaten_pellets:
-                score += len(eaten_pellets) * 10
+                eaten_pellets = pygame.sprite.spritecollide(player, pellets, True)
+                if eaten_pellets:
+                    score += len(eaten_pellets) * 10
 
-            if not cheats_enabled and pygame.sprite.spritecollide(player, ghosts, False):
-                game_over = True
+                if not cheats_enabled:
+                    if pygame.sprite.spritecollide(player, ghosts, False):
+                        game_over = True
 
-            if len(pellets) == 0:
-                game_won = True
+                if len(pellets) == 0:
+                    game_won = True
 
             screen.fill(BLACK)
-
-            temp_walls = []
-            draw_map(screen, temp_walls)
-
+            draw_map(screen)
             pellets.draw(screen)
             all_sprites.draw(screen)
 
-            draw_text(f"Pontuação: {score}", font_small, WHITE, screen, 10, 10, center=False)
-
+            draw_text(f"Pontuação: {score}", font_small, WHITE, screen, 20, 10, center=False)
             if cheats_enabled:
-                draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, WIDTH - 100, 10, center=False)
+                draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, WIDTH - 150, 10, center=True)
+
+            if game_over:
+                overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                screen.blit(overlay, (0, 0))
+                draw_text("GAME OVER", font_large, RED, screen, WIDTH / 2, HEIGHT / 2 - 40)
+                draw_text("Pressione [ESPAÇO] para reiniciar", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 30)
+                draw_text("ou [ESC] para sair", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
+
+            if game_won:
+                overlay = pygame.Surface((WIDTH, HEIGHT), pygame.SRCALPHA)
+                overlay.fill((0, 0, 0, 180))
+                screen.blit(overlay, (0, 0))
+                draw_text("VOCÊ VENCEU!", font_large, GREEN, screen, WIDTH / 2, HEIGHT / 2 - 40)
+                draw_text(f"Score Final: {score}", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 20)
+                draw_text("Pressione [ESPAÇO] para reiniciar", font_small, WHITE, screen, WIDTH / 2, HEIGHT / 2 + 60)
 
             pygame.display.flip()
             clock.tick(60)
 
-    game_loop()
+        return score
+
+    return game_loop()
