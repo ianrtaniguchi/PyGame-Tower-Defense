@@ -115,12 +115,12 @@ def load_image(filename, placeholder_size, placeholder_color, colorkey=None):
         return create_placeholder_surface(*placeholder_size, placeholder_color)
 
 
-def load_sound(
-    filename,
-):  # Tenta carregar um som, se falhar, retorna um objeto vazio do tipo 'none'
+def load_sound(filename, volume=0.20):  # Tenta carregar um som, se falhar, retorna um objeto vazio do tipo 'none'
     try:
-        # CONVERTE O PATH PARA UMA STRING (erro de depreciated)
-        return pygame.mixer.Sound(str(SOUNDS_DIR / filename))
+        sound = pygame.mixer.Sound(str(SOUNDS_DIR / filename))
+        sound.set_volume(volume)
+        return sound
+
     except pygame.error:
         print(f"AVISO: Som '{filename}' não encontrado.")
         return None
@@ -595,13 +595,13 @@ def draw_upgrade_menu(surface, tower, money):
     btn_dmg = pygame.Rect(400, GAME_HEIGHT + 40, 200, 40)
     color_dmg = GREEN if money >= cost_dmg else GREY
     pygame.draw.rect(surface, color_dmg, btn_dmg)
-    draw_text(f"UP Dano (${cost_dmg})", font_small, BLACK, surface, btn_dmg.centerx, btn_dmg.centery, center=True)
+    draw_text(f"UP Dano (-${cost_dmg})", font_small, BLACK, surface, btn_dmg.centerx, btn_dmg.centery, center=True)
 
     # Botão Velocidade
     btn_spd = pygame.Rect(620, GAME_HEIGHT + 40, 200, 40)
     color_spd = ORANGE if money >= cost_spd else GREY
     pygame.draw.rect(surface, color_spd, btn_spd)
-    draw_text(f"UP Rapidez (${cost_spd})", font_small, BLACK, surface, btn_spd.centerx, btn_spd.centery, center=True)
+    draw_text(f"UP Rapidez (-${cost_spd})", font_small, BLACK, surface, btn_spd.centerx, btn_spd.centery, center=True)
 
     # Botão Vender
     btn_sell = pygame.Rect(840, GAME_HEIGHT + 40, 200, 40)
@@ -650,6 +650,39 @@ def draw_tower_preview(surface, mouse_pos, tower_type):  # Desenha o preview da 
 # =============================================================================
 
 
+def run_transition(screen, clock):
+    duration_flash = 100
+    duration_fade = 1000
+
+    flash_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    flash_surface.fill(WHITE)
+
+    fade_surface = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+    fade_surface.fill(BLACK)
+
+    if sfx_build:
+        sfx_build.play()
+
+    start_time = pygame.time.get_ticks()
+    while pygame.time.get_ticks() - start_time < duration_flash:
+        # Calcula alfa (transparência) decrescente
+        elapsed = pygame.time.get_ticks() - start_time
+        alpha = 255 - int((elapsed / duration_flash) * 255)
+        flash_surface.set_alpha(alpha)
+
+        screen.blit(flash_surface, (0, 0))
+        pygame.display.flip()
+        clock.tick(60)
+
+    for alpha in range(0, 260, 5):
+        fade_surface.set_alpha(alpha)
+        screen.blit(fade_surface, (0, 0))
+        pygame.display.flip()
+        clock.tick(60)
+
+    pygame.time.wait(200)
+
+
 def main(screen, clock, cheats_enabled):  # Função principal do jogo
     running = True
     game_state = "START_MENU"
@@ -682,7 +715,7 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
 
     # Toca a música selecionada
     if current_music:
-        current_music.set_volume(0.3)
+        current_music.set_volume(0.1)
         current_music.play(loops=-1)
 
     # Grupos dos sprites
@@ -737,6 +770,7 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
 
             if game_state == "START_MENU":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
+                    run_transition(screen, clock)
                     game_state = "PLAYING"
                     wave = 0
 
@@ -899,6 +933,12 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
 
         if game_state == "START_MENU":
             screen.blit(background_image, (0, 0))
+
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(200)
+            overlay.fill(BLACK)
+            screen.blit(overlay, (0, 0))
+
             draw_text("TOWER DEFENSE", font_large, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 - 50, center=True)
             draw_text("Pressione [ESPAÇO] para começar", font_medium, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 20, center=True)
             draw_text("Pressione [ESC] para voltar ao Hub", font_small, WHITE, screen, SCREEN_WIDTH / 2, SCREEN_HEIGHT / 2 + 60, center=True)
