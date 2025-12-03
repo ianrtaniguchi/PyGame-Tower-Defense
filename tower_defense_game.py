@@ -343,10 +343,12 @@ class Enemy(pygame.sprite.Sprite):
 class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
     def __init__(self, tower_type, pos):
         super().__init__()
+        self.data = TOWER_DATA[tower_type].copy()  # Copy é importante para não alterar o original
+        self.damage_level = 1
+        self.speed_level = 1
 
         self.pos = pygame.math.Vector2(pos)
         self.tower_type = tower_type
-        self.data = TOWER_DATA[tower_type]  # Usa o TOWER_DATA global (que pode estar modificado)
 
         self.image = self.data["image"]
         self.range = self.data["range"]
@@ -356,6 +358,26 @@ class Tower(pygame.sprite.Sprite):  # Classe para as torres de defesa.
         self.rect = self.image.get_rect(center=self.pos)
         self.last_shot_time = pygame.time.get_ticks()
         self.target = None
+
+    def get_upgrade_cost(self, upgrade_type):
+        base_cost = self.data["cost"]
+        if upgrade_type == "damage":
+            return int(base_cost * 0.6 * self.damage_level)
+        elif upgrade_type == "speed":
+            return int(base_cost * 0.6 * self.speed_level)
+        return 0
+
+    def upgrade_damage(self):
+        self.damage = int(self.damage * 1.3)  # Aumenta 30%
+        self.damage_level += 1
+        if sfx_build:
+            sfx_build.play()
+
+    def upgrade_speed(self):
+        self.fire_rate = int(self.fire_rate * 0.85)  # Reduz tempo em 15% (atira mais rápido)
+        self.speed_level += 1
+        if sfx_build:
+            sfx_build.play()
 
     def update(self, enemy_group, projectile_group):  # Encontra um alvo e atira.
         self.find_target(enemy_group)
@@ -553,6 +575,43 @@ def draw_ui(surface, lives, money, wave, total_waves, buttons):  # Desenha a UI 
         button.draw(surface, money)
 
 
+def draw_upgrade_menu(surface, tower, money):
+    panel_rect = pygame.Rect(0, GAME_HEIGHT, SCREEN_WIDTH, UI_PANEL_HEIGHT)
+    pygame.draw.rect(surface, (40, 40, 50), panel_rect)
+    pygame.draw.rect(surface, WHITE, panel_rect, 2)
+
+    # Informações da Torre
+    info_text = f"Torre: {tower.tower_type.upper()} | Dano: {tower.damage} | Delay: {tower.fire_rate}ms"
+    draw_text(info_text, font_medium, WHITE, surface, 20, GAME_HEIGHT + 10)
+
+    # Custos
+    cost_dmg = tower.get_upgrade_cost("damage")
+    cost_spd = tower.get_upgrade_cost("speed")
+    refund = int(tower.data["cost"] * 0.75)
+
+    # Definição dos Botões (Rects)
+    # Botão Dano
+    btn_dmg = pygame.Rect(400, GAME_HEIGHT + 40, 200, 40)
+    color_dmg = GREEN if money >= cost_dmg else GREY
+    pygame.draw.rect(surface, color_dmg, btn_dmg)
+    draw_text(f"UP Dano (${cost_dmg})", font_small, BLACK, surface, btn_dmg.centerx, btn_dmg.centery, center=True)
+
+    # Botão Velocidade
+    btn_spd = pygame.Rect(620, GAME_HEIGHT + 40, 200, 40)
+    color_spd = ORANGE if money >= cost_spd else GREY
+    pygame.draw.rect(surface, color_spd, btn_spd)
+    draw_text(f"UP Rapidez (${cost_spd})", font_small, BLACK, surface, btn_spd.centerx, btn_spd.centery, center=True)
+
+    # Botão Vender
+    btn_sell = pygame.Rect(840, GAME_HEIGHT + 40, 200, 40)
+    pygame.draw.rect(surface, RED, btn_sell)
+    draw_text(f"Vender (+${refund})", font_small, WHITE, surface, btn_sell.centerx, btn_sell.centery, center=True)
+
+    draw_text("Pressione ESC para cancelar seleção", font_small, WHITE, surface, SCREEN_WIDTH - 250, GAME_HEIGHT + 10)
+
+    return btn_dmg, btn_spd, btn_sell
+
+
 def draw_tower_slots(surface, selected_tower_type):  # pega as coordenadas dos slots que podem ser construidos e desenha eles
     for i, rect in enumerate(TORRE_SLOT_RECTS):
         # Só desenha slots vazios
@@ -650,6 +709,9 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
         nonlocal money
         money += amount
 
+    # Variável nova para controlar a torre selecionada
+    selected_tower_instance = None
+
     while running:
         clock.tick(FPS)
         mouse_pos = pygame.mouse.get_pos()
@@ -659,14 +721,18 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
             if event.type == pygame.QUIT:
                 running = False
                 if current_music:
-                    current_music.stop()  # Para a música ao fechar
+                    current_music.stop()
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    # Cancela tudo
                     selected_tower_type = None
-                    running = False  # Sai para o menu do hub
-                    if current_music:
-                        current_music.stop()  # Para a música ao dar ESC
+                    selected_tower_instance = None
+                    # Se pressionar ESC de novo, sai do jogo (opcional, mantendo lógica original)
+                    if not selected_tower_instance and not selected_tower_type:
+                        running = False
+                        if current_music:
+                            current_music.stop()
 
             if game_state == "START_MENU":
                 if event.type == pygame.KEYDOWN and event.key == pygame.K_SPACE:
@@ -685,44 +751,101 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
                                 current_music.stop()
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-                    clicked_button = False
-                    for tower_type, button in buttons.items():
-                        if button.is_clicked(mouse_pos):
-                            if money >= button.cost:
-                                selected_tower_type = tower_type
-                            clicked_button = True
-                            break
+                    clicked_interface = False
 
-                    if not clicked_button and selected_tower_type:
-                        for i, rect in enumerate(TORRE_SLOT_RECTS):
-                            if i not in occupied_slots and rect.collidepoint(mouse_pos):
-                                cost = TOWER_DATA[selected_tower_type]["cost"]
-                                if money >= cost:
-                                    money -= cost
-                                    new_tower = Tower(selected_tower_type, rect.center)
-                                    tower_group.add(new_tower)
-                                    occupied_slots.append(i)
-                                    if sfx_build:
-                                        sfx_build.play()
-                                    selected_tower_type = None
-                                break
+                    # 1. Se uma torre JÁ estiver selecionada, checa cliques no menu de upgrade
+                    if selected_tower_instance:
+                        # Recalcula os rects dos botões (mesma lógica do draw) para checar colisão
+                        # (Idealmente seria uma classe, mas faremos direto aqui pela simplicidade)
+                        btn_dmg = pygame.Rect(400, GAME_HEIGHT + 40, 200, 40)
+                        btn_spd = pygame.Rect(620, GAME_HEIGHT + 40, 200, 40)
+                        btn_sell = pygame.Rect(840, GAME_HEIGHT + 40, 200, 40)
+
+                        # Lógica UPGRADE DANO
+                        if btn_dmg.collidepoint(mouse_pos):
+                            cost = selected_tower_instance.get_upgrade_cost("damage")
+                            if money >= cost:
+                                money -= cost
+                                selected_tower_instance.upgrade_damage()
+                            clicked_interface = True
+
+                        # Lógica UPGRADE VELOCIDADE
+                        elif btn_spd.collidepoint(mouse_pos):
+                            cost = selected_tower_instance.get_upgrade_cost("speed")
+                            if money >= cost:
+                                money -= cost
+                                selected_tower_instance.upgrade_speed()
+                            clicked_interface = True
+
+                        # Lógica VENDER
+                        elif btn_sell.collidepoint(mouse_pos):
+                            refund = int(selected_tower_instance.data["cost"] * 0.75)
+                            add_money(refund)
+                            # Liberar slot
+                            for i, rect in enumerate(TORRE_SLOT_RECTS):
+                                if rect.center == selected_tower_instance.rect.center:
+                                    if i in occupied_slots:
+                                        occupied_slots.remove(i)
+                                    break
+                            selected_tower_instance.kill()
+                            selected_tower_instance = None
+                            if sfx_build:
+                                sfx_build.play()
+                            clicked_interface = True
+
+                    # 2. Se não clicou na interface de upgrade, tenta selecionar torre ou botão de build
+                    if not clicked_interface:
+                        # Verifica clique nos botões de construção (se NENHUMA torre selecionada)
+                        if not selected_tower_instance:
+                            for tower_type, button in buttons.items():
+                                if button.is_clicked(mouse_pos):
+                                    if money >= button.cost:
+                                        selected_tower_type = tower_type
+                                        selected_tower_instance = None  # Garante que desseleciona torre
+                                    clicked_interface = True
+                                    break
+
+                        # Verifica clique no Mapa
+                        if not clicked_interface:
+                            # Tenta SELECIONAR uma torre existente
+                            clicked_on_tower = False
+                            for tower in tower_group:
+                                if tower.rect.collidepoint(mouse_pos):
+                                    selected_tower_instance = tower
+                                    selected_tower_type = None  # Para de construir
+                                    clicked_on_tower = True
+                                    break
+
+                            # Se não clicou em torre, tenta CONSTRUIR (se tiver tipo selecionado)
+                            if not clicked_on_tower:
+                                selected_tower_instance = None  # Clicar no vazio desseleciona a torre atual
+                                if selected_tower_type:
+                                    for i, rect in enumerate(TORRE_SLOT_RECTS):
+                                        if i not in occupied_slots and rect.collidepoint(mouse_pos):
+                                            cost = TOWER_DATA[selected_tower_type]["cost"]
+                                            if money >= cost:
+                                                money -= cost
+                                                new_tower = Tower(selected_tower_type, rect.center)
+                                                tower_group.add(new_tower)
+                                                occupied_slots.append(i)
+                                                if sfx_build:
+                                                    sfx_build.play()
+                                                selected_tower_type = None
+                                            break
 
             elif game_state in ["GAME_OVER", "WIN"]:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
+                        # Reset do jogo
                         game_state = "START_MENU"
                         lives = INITIAL_LIVES
                         money = INITIAL_MONEY
-
-                        # Reinicia a música se necessário
                         if current_music:
                             current_music.stop()
                             current_music.play(loops=-1)
-
                         if cheats_enabled:
                             money = 99999
                             lives = 99
-
                         wave = 0
                         enemy_group.empty()
                         tower_group.empty()
@@ -730,6 +853,7 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
                         occupied_slots.clear()
                         wave_in_progress = False
                         wave_spawn_list = []
+                        selected_tower_instance = None  # Reset seleção
 
                     elif event.key == pygame.K_ESCAPE:
                         running = False
@@ -744,6 +868,7 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
             tower_group.update(enemy_group, projectile_group)
             projectile_group.update(enemy_group, add_money)
 
+            # Lógica de Waves
             if not wave_in_progress and not enemy_group:
                 if wave < total_waves:
                     wave += 1
@@ -780,14 +905,29 @@ def main(screen, clock, cheats_enabled):  # Função principal do jogo
         elif game_state == "PLAYING":
             screen.blit(background_image, (0, 0))
             draw_tower_slots(screen, selected_tower_type)
+
+            # Se uma torre estiver selecionada, desenha o alcance dela
+            if selected_tower_instance:
+                selected_tower_instance.draw_range(screen)
+                # Destaque visual na torre selecionada (borda amarela)
+                pygame.draw.circle(screen, (255, 255, 0), selected_tower_instance.rect.center, 30, 2)
+
             enemy_group.draw(screen)
             tower_group.draw(screen)
             projectile_group.draw(screen)
+
             for enemy in enemy_group:
                 enemy.draw_health_bar(screen)
-            if mouse_pos:
+
+            if mouse_pos and selected_tower_type:
                 draw_tower_preview(screen, mouse_pos, selected_tower_type)
-            draw_ui(screen, lives, money, wave, total_waves, buttons)
+
+            # Lógica de qual UI desenhar
+            if selected_tower_instance:
+                draw_upgrade_menu(screen, selected_tower_instance, money)
+            else:
+                draw_ui(screen, lives, money, wave, total_waves, buttons)
+
             if cheats_enabled:
                 draw_text("CHEATS ATIVADOS", font_small, GREEN, screen, SCREEN_WIDTH - 100, 20, center=True)
 
