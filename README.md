@@ -1,8 +1,3 @@
-Com base na análise do código fonte, o projeto evoluiu de um simples *Tower Defense* para um **Hub de Jogos** completo, integrado com Firebase para autenticação e placar online, contendo mais de 10 jogos diferentes.
-
-Aqui está o `README.md` atualizado para refletir o estado real do projeto:
-
-````markdown
 # 🎮 PyGame Game Hub & Tower Defense
 
 **Uma plataforma completa de mini-games desenvolvida em Python e Pygame, com sistema de login, ranking online e múltiplos jogos.**
@@ -104,5 +99,4 @@ O Hub possui um sistema de trapaças global. Se ativado, concede vantagens como 
 
 *Projeto desenvolvido para a disciplina de Engenharia Mecânica / Programação - 2025.*
 
-```
 ```
