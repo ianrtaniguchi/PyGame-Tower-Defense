@@ -5,7 +5,11 @@ import sys
 import math
 
 
-def main(screen, clock, cheats_enabled):
+def main(
+    screen,
+    clock,
+    cheats_enabled,
+):
     WIDTH = screen.get_width()
     HEIGHT = screen.get_height()
 

@@ -30,7 +30,7 @@ def main(screen, clock, cheats_enabled):
 
     GRID_ROWS = 4
     GRID_COLS = 5
-    CARD_SIZE = 100
+    CARD_SIZE = 150
     CARD_GAP = 10
 
     GRID_WIDTH = (CARD_SIZE + CARD_GAP) * GRID_COLS

@@ -3,6 +3,7 @@
 import pygame
 import sys
 import random
+import os
 
 
 def main(screen, clock, cheats_enabled):
@@ -54,13 +55,33 @@ def main(screen, clock, cheats_enabled):
         "1111111111111111111111111111",
     ]
 
+    def load_img(path, size):
+        full_path = os.path.join("assets", "images", path)
+        if os.path.exists(full_path):
+            try:
+                img = pygame.image.load(full_path).convert_alpha()
+                # print("carregou")
+                return pygame.transform.scale(img, size)
+            except Exception as e:
+                print(f"Erro ao carregar imagem {path}: {e}")  # facilitar achar erro
+        return None
+
     class Player(pygame.sprite.Sprite):
         def __init__(self, x, y):
             super().__init__()
-            self.image = pygame.Surface((CELL_SIZE - 4, CELL_SIZE - 4))
-            self.image.fill(YELLOW)
-            pygame.draw.circle(self.image, BLACK, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 2 - 2)
-            pygame.draw.circle(self.image, YELLOW, (self.image.get_width() // 2, self.image.get_height() // 2), CELL_SIZE // 2 - 3)
+            size = (CELL_SIZE - 4, CELL_SIZE - 4)
+            self.sprite_img = load_img("Pacman/pacman-1.png.png", size)
+
+            if self.sprite_img:
+                self.image = self.sprite_img
+                self.original_image = self.sprite_img
+            else:
+                self.image = pygame.Surface(size)  # desenho quadrado
+                self.image.fill(YELLOW)
+                pygame.draw.circle(self.image, BLACK, (size[0] // 2, size[1] // 2), CELL_SIZE // 2 - 2)
+                pygame.draw.circle(self.image, YELLOW, (size[0] // 2, size[1] // 2), CELL_SIZE // 2 - 3)
+                self.original_image = None
+            self.angle = 0
             self.rect = self.image.get_rect(topleft=(MAP_OFFSET_X + x * CELL_SIZE + 2, MAP_OFFSET_Y + y * CELL_SIZE + 2))
             self.grid_x = x
             self.grid_y = y
@@ -93,18 +114,37 @@ def main(screen, clock, cheats_enabled):
             self.rect.y += self.direction[1] * self.speed
 
             if self.rect.right <= MAP_OFFSET_X:
-                self.rect.x = MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE) - self.rect.width
+                self.rect.x = MAP_OFFSET_X + ((GRID_WIDTH - 1) * CELL_SIZE) + 2
             elif self.rect.left >= MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE):
-                self.rect.x = MAP_OFFSET_X
+                self.rect.x = MAP_OFFSET_X + 2
+
+            if self.original_image and self.direction != (0, 0):
+                if self.direction == (1, 0):
+                    rot = 0
+                elif self.direction == (-1, 0):
+                    rot = 180
+                elif self.direction == (0, -1):
+                    rot = 90
+                elif self.direction == (0, 1):
+                    rot = 270
+                else:
+                    rot = 0
+                self.image = pygame.transform.rotate(self.original_image, rot)
 
         def set_direction(self, dx, dy):
             self.next_direction = (dx, dy)
 
     class Ghost(pygame.sprite.Sprite):
-        def __init__(self, x, y, color):
+
+        def __init__(self, x, y, color, img_file):
             super().__init__()
-            self.image = pygame.Surface((CELL_SIZE - 4, CELL_SIZE - 4))
-            self.image.fill(color)
+            size = (CELL_SIZE - 4, CELL_SIZE - 4)
+            self.sprite = load_img(f"Pacman/fantasmas/{img_file}", size)
+            if self.sprite:
+                self.image = self.sprite
+            else:
+                self.image = pygame.Surface(size)
+                self.image.fill(color)
             self.rect = self.image.get_rect(topleft=(MAP_OFFSET_X + x * CELL_SIZE + 2, MAP_OFFSET_Y + y * CELL_SIZE + 2))
             self.grid_x = x
             self.grid_y = y
@@ -146,9 +186,9 @@ def main(screen, clock, cheats_enabled):
                     self.direction = (0, 0)
 
             if self.rect.right <= MAP_OFFSET_X:
-                self.rect.x = MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE) - self.rect.width
+                self.rect.x = MAP_OFFSET_X + ((GRID_WIDTH - 1) * CELL_SIZE) + 2
             elif self.rect.left >= MAP_OFFSET_X + (GRID_WIDTH * CELL_SIZE):
-                self.rect.x = MAP_OFFSET_X
+                self.rect.x = MAP_OFFSET_X + 2
 
     class Pellet(pygame.sprite.Sprite):
         def __init__(self, x, y):
@@ -181,10 +221,16 @@ def main(screen, clock, cheats_enabled):
         player = Player(1, 1)
         all_sprites.add(player)
 
-        ghost_list = [Ghost(12, 8, RED), Ghost(13, 8, GREEN), Ghost(14, 8, PINK), Ghost(15, 8, ORANGE)]
+        ghost_specs = [
+            (12, 8, RED, "fantasma pacman-1.png.png"),
+            (13, 8, GREEN, "fantasma pacman-3.png.png"),
+            (14, 8, PINK, "fantasma pacman-2.png.png"),
+            (15, 8, ORANGE, "fantasma pacman-4.png.png"),
+        ]
 
-        for g in ghost_list:
-            all_sprites.add(g)
+        for gx, gy, col, img_name in ghost_specs:
+            g = Ghost(gx, gy, col, img_name)
+            all_sprites.add(g)  # adiciona no vetor de sprites
             ghosts.add(g)
 
         for y, row in enumerate(MAP):

@@ -2,6 +2,9 @@
 # Necessário instalar as dependências: pygame, pyrebase4
 # Use:
 # -pip install pygame pyrebase4
+import importlib  # COMENTAR DEPOIS
+import random
+import string
 
 import pygame
 import requests
@@ -40,7 +43,7 @@ clock = pygame.time.Clock()
 
 try:
     import tower_defense_game, snake_game, ping_pong_game, tic_tac_toe_game
-    import space_invaders_game, flappy_bird_game, pacman_game, cookie_clicker_game
+    import clash_royale_impostor, flappy_bird_game, pacman_game, cookie_clicker_game
     import memory_game, doisK_game, quiz_game, evade_game
 except ImportError as e:
     print(f"AVISO: Algum jogo não foi encontrado. {e}")
@@ -145,6 +148,37 @@ class Button:
                 self.callback()
                 return True
         return False
+    
+    def start_multiplayer_tictactoe(db):
+    choice = input("Digite 1 para CRIAR sala ou 2 para ENTRAR em uma: ")
+    if choice == '1':
+        game_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
+        print(f"SALHA CRIADA! SEU CÓDIGO É: {game_id}")
+        
+        initial_state = {
+            "board": [[0,0,0], [0,0,0], [0,0,0]],
+            "turn": 1, 
+            "winner": 0
+        }
+        db.child("tictactoe").child(game_id).set(initial_state)
+        
+        return game_id, 1 
+        
+    elif choice == '2':
+        game_id = input("Digite o código da sala: ").strip().upper()
+        if db.child("tictactoe").child(game_id).get().val():
+            print(f"Entrando na sala {game_id}...")
+            return game_id, 2
+        else:
+            print("Sala não encontrada!")
+            return None, None
+            
+    return None, None
+
+    def launch_mp_tictactoe():
+    game_id, role = start_multiplayer_tictactoe(db)
+    if game_id:
+        tic_tac_toe_game.main(screen, clock, cheats_enabled, db, game_id, role)
 
 
 def submit_score(game_name, score):
@@ -190,7 +224,6 @@ def submit_score(game_name, score):
             print(f"Aviso leitura score (possível permissão/internet): {e}")
             curr = None
 
-        # 2) Só salva se for recorde ou primeira vez
         if curr is None or score > curr:
             print(f"Salvando novo recorde para {user_name} (UID: {user_id}) em {game_name}: {score}")
             try:
@@ -201,8 +234,6 @@ def submit_score(game_name, score):
                     print(f"ERRO ao escrever score no Firebase: {put_resp.status_code} - {put_resp.text}")
             except Exception as e:
                 print(f"ERRO ao escrever score no Firebase (possível Permission denied): {e}")
-        else:
-            print(f"Score {score} NÃO é maior que o atual ({curr}) para {user_name} em {game_name}. Não sobrescrevendo.")
 
     except Exception as e:
         print(f"ERRO CRÍTICO ao salvar score: {e}")
@@ -265,6 +296,7 @@ def show_scoreboard(game_name, game_title):
 
 def run_game(module, name):
     try:
+        importlib.reload(module)
         s = module.main(screen, clock, cheats_enabled)
         if s is not None:
             submit_score(name, s)
@@ -384,7 +416,8 @@ def main():
         ("Snake", lambda: run_game(snake_game, "snake_game")),
         ("Ping Pong", lambda: run_game(ping_pong_game, "ping_pong")),
         ("Jogo da Velha", lambda: run_game(tic_tac_toe_game, "tic_tac_toe")),
-        ("Space Invaders", lambda: run_game(space_invaders_game, "space_invaders_game")),
+        ("Jogo da Velha Online", launch_mp_tictactoe),
+        ("Impostor - CR", lambda: run_game(clash_royale_impostor, "clash_royale_impostor")),
         ("Flappy Bird", lambda: run_game(flappy_bird_game, "flappy_bird_game")),
         ("Pac-Man", lambda: run_game(pacman_game, "pacman_game")),
         ("Cookie Clicker", lambda: run_game(cookie_clicker_game, "cookie_clicker_game")),
@@ -404,7 +437,20 @@ def main():
 
     btns_score = []
 
-    score_data = [("Tower Defense", "tower_defense_game"), ("Snake", "snake_game"), ("Ping Pong", "ping_pong"), ("Jogo da Velha", "tic_tac_toe"), ("Space Invaders", "space_invaders_game"), ("Flappy Bird", "flappy_bird_game"), ("Pac-Man", "pacman_game"), ("Cookie Clicker", "cookie_clicker_game"), ("Memória", "memory_game"), ("2048", "doisK_game"), ("Quiz", "quiz_game"), ("Evade", "evade_game")]
+    score_data = [
+        ("Tower Defense", "tower_defense_game"),
+        ("Snake", "snake_game"),
+        ("Ping Pong", "ping_pong"),
+        ("Jogo da Velha", "tic_tac_toe"),
+        ("Impostor", "clash_royale_impostor"),
+        ("Flappy Bird", "flappy_bird_game"),
+        ("Pac-Man", "pacman_game"),
+        ("Cookie Clicker", "cookie_clicker_game"),
+        ("Memória", "memory_game"),
+        ("2048", "doisK_game"),
+        ("Quiz", "quiz_game"),
+        ("Evade", "evade_game"),
+    ]
 
     for i, (title, db_id) in enumerate(score_data):
         c, r = i % 4, i // 4

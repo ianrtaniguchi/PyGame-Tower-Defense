@@ -4,6 +4,6 @@
     "simpleCodingTimeTracker.health.enableNotifications": true,
     "simpleCodingTimeTracker.health.modalNotifications": true,
     "simpleCodingTimeTracker.health.eyeRestInterval": 20,
-    "simpleCodingTimeTracker.health.stretchInterval": 10,
+    "simpleCodingTimeTracker.health.stretchInterval": 15,
     "simpleCodingTimeTracker.health.breakThreshold": 90
 }

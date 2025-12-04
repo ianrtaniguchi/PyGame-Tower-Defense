@@ -81,11 +81,11 @@ def main(screen, clock, cheats_enabled):
                     print(f"Erro ao carregar {filename}: {e}")
         return None
 
-    bird_path = os.path.join("flappy bird", "flappy-1.png.png")
-    loaded_bird = load_image_asset(bird_path, (40, 30))
+    bird_path = os.path.join("flappy bird", "flappy.png")
+    loaded_bird = load_image_asset(bird_path, (60, 45))
     BIRD_IMG_ORIGINAL = loaded_bird if loaded_bird else create_bird_surface()
-
-    pipe_path = os.path.join("flappy bird", "cano-1.png.png")
+    pipe_path = os.path.join("flappy bird", "pipe.png")
+    PIPE_IMG_BASE = load_image_asset(pipe_path)
 
     class Bird(pygame.sprite.Sprite):
         def __init__(self):

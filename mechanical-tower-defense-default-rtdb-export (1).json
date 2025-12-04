@@ -1,0 +1,74 @@
+{
+  "scores": {
+    "flappy_bird_game": {
+      "3s8wRtCqQJdkii1p937MyGI8GQ83": {
+        "name": "zejuma",
+        "score": 676767
+      },
+      "FyW9mYVYFUaQKptyT09Hw5J80353": {
+        "name": "Pupypsolon",
+        "score": 696969
+      },
+      "ugwromJKmKV417kUrtJhGsRAoNN2": {
+        "name": "Yakut_",
+        "score": 999999
+      }
+    },
+    "pacman_game": {
+      "3s8wRtCqQJdkii1p937MyGI8GQ83": {
+        "name": "zejuma",
+        "score": 676767
+      },
+      "FyW9mYVYFUaQKptyT09Hw5J80353": {
+        "name": "Pupypsolon",
+        "score": 696969
+      },
+      "ugwromJKmKV417kUrtJhGsRAoNN2": {
+        "name": "Yakut_",
+        "score": 999999
+      }
+    },
+    "snake_game": {
+      "3s8wRtCqQJdkii1p937MyGI8GQ83": {
+        "name": "zejuma",
+        "score": 676767
+      },
+      "FyW9mYVYFUaQKptyT09Hw5J80353": {
+        "name": "Pupypsolon",
+        "score": 696969
+      },
+      "ugwromJKmKV417kUrtJhGsRAoNN2": {
+        "name": "Yakut_",
+        "score": 999999
+      }
+    },
+    "space_invaders_game": {
+      "3s8wRtCqQJdkii1p937MyGI8GQ83": {
+        "name": "zejuma",
+        "score": 676767
+      },
+      "FyW9mYVYFUaQKptyT09Hw5J80353": {
+        "name": "Pupypsolon",
+        "score": 696969
+      },
+      "ugwromJKmKV417kUrtJhGsRAoNN2": {
+        "name": "Yakut_",
+        "score": 999999
+      }
+    },
+    "tower_defense_game": {
+      "3s8wRtCqQJdkii1p937MyGI8GQ83": {
+        "name": "zejuma",
+        "score": 676767
+      },
+      "FyW9mYVYFUaQKptyT09Hw5J80353": {
+        "name": "Pupypsolon",
+        "score": 696969
+      },
+      "ugwromJKmKV417kUrtJhGsRAoNN2": {
+        "name": "Yakut_",
+        "score": 999999
+      }
+    }
+  }
+}
