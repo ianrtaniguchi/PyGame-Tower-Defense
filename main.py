@@ -57,6 +57,7 @@ GRID_COLOR = (35, 40, 50)
 PANEL_COLOR = (30, 32, 40)
 TEXT_COLOR = (240, 240, 245)
 PRIMARY_COLOR = (0, 180, 160)
+ROSA_BEBE = (255, 182, 193)
 PRIMARY_HOVER = (0, 210, 190)
 SECONDARY_COLOR = (60, 65, 80)
 SECONDARY_HOVER = (80, 85, 100)
@@ -160,22 +161,19 @@ def submit_score(game_name, score):
         return
 
     try:
-        # Dados do usuário autenticado
-        user_id = user_info.get("localId")  # UID do Firebase Auth
-        user_token = user_info.get("idToken")  # Token de acesso
+        user_id = user_info.get("localId")
+        user_token = user_info.get("idToken")
         user_email = user_info.get("email")
 
         if not user_id or not game_name or not user_token:
             print(f"AVISO: Tentativa de salvar score sem dados suficientes." f" UID: {user_id}, Jogo: {game_name}, Token presente? {user_token is not None}")
             return
 
-        # Nome do jogador
         if user_email:
             user_name = user_email.split("@")[0]
         else:
             user_name = "Jogador"
 
-        # Garante que o score é número
         try:
             score = int(score)
         except (TypeError, ValueError):
@@ -215,15 +213,11 @@ def submit_score(game_name, score):
 def show_scoreboard(game_name, game_title):
     scores = []
     try:
-        # CORREÇÃO: Obtém o token do usuário logado
         user_token = user_info.get("idToken")
 
-        # CORREÇÃO: Passa o token para o firebase na hora de buscar (token=user_token)
-        # Sem isso, se o banco tiver regras de segurança, a leitura é bloqueada.
         data = db.child("scores").child(game_name).order_by_child("score").limit_to_last(10).get(token=user_token).val()
 
         if data:
-            # Ordena decrescente (maior pontuação primeiro)
             scores = sorted(data.items(), key=lambda i: i[1].get("score", 0), reverse=True)
     except Exception as e:
         print(f"Erro ao carregar ranking de {game_title}: {e}")
@@ -253,9 +247,8 @@ def show_scoreboard(game_name, game_title):
             for i, (_, d) in enumerate(scores):
                 if i >= 10:
                     break
-                col = PRIMARY_COLOR if i == 0 else TEXT_COLOR  # Destaca o 1º lugar
+                col = ROSA_BEBE if i == 0 else TEXT_COLOR
 
-                # Formatação segura dos dados
                 nome_jogador = d.get("name", "Desconhecido")
                 pontuacao = d.get("score", 0)
 
