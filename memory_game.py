@@ -1,9 +1,10 @@
-# JOGO FUNCIONAL
+# JOGO FUNCIONAL PRONTO
 # Implementação do Jogo da Memória para o Hub de Jogos
 import pygame
 import sys
 import random
 import math
+import os
 
 
 def main(screen, clock, cheats_enabled):
@@ -39,6 +40,28 @@ def main(screen, clock, cheats_enabled):
 
     TOTAL_PAIRS = (GRID_ROWS * GRID_COLS) // 2
 
+    base_img_path = os.path.join("assets", "images", "memoria")
+    loaded_images = {}
+    for i in range(1, TOTAL_PAIRS + 1):
+        image_found = False
+        for ext in [".png", ".jpg", ".jpeg"]:
+            image_filename = f"memoria_{i}{ext}"
+            full_path = os.path.join(base_img_path, image_filename)
+
+            if os.path.exists(full_path):
+                try:
+                    img = pygame.image.load(full_path)  # Carrega do caminho correto
+                    img = pygame.transform.scale(img, (CARD_SIZE, CARD_SIZE))
+                    loaded_images[i] = img
+                    image_found = True
+                    break
+                except Exception as e:
+                    print(f"Erro ao carregar {full_path}: {e}")
+
+        if not image_found:
+            loaded_images[i] = None
+            print(f"AVISO: Foto 'memoria_{i}' não encontrada em {base_img_path}. Usando número.")
+
     def draw_text(text, font, color, surface, x, y, center=True):
         text_obj = font.render(text, True, color)
         text_rect = text_obj.get_rect()
@@ -69,6 +92,17 @@ def main(screen, clock, cheats_enabled):
                     return (r, c)
         return None
 
+    def draw_card_content(surface, card):
+        rect = card["rect"]
+        photo = loaded_images.get(card["value"])
+
+        if photo:
+            surface.blit(photo, rect.topleft)
+            pygame.draw.rect(surface, WHITE, rect, 2, border_radius=8)
+        else:
+            pygame.draw.rect(surface, WHITE, rect, border_radius=8)
+            draw_text(str(card["value"]), font_large, BLACK, surface, rect.centerx, rect.centery)
+
     def draw_board(board):
         for r in range(GRID_ROWS):
             for c in range(GRID_COLS):
@@ -77,32 +111,54 @@ def main(screen, clock, cheats_enabled):
 
                 if card["state"] == "hidden":
                     pygame.draw.rect(screen, BLUE, rect, border_radius=8)
+                    pygame.draw.rect(screen, WHITE, rect, 2, border_radius=8)
+
                 elif card["state"] == "revealed":
-                    pygame.draw.rect(screen, WHITE, rect, border_radius=8)
-                    draw_text(str(card["value"]), font_large, BLACK, screen, rect.centerx, rect.centery)
+                    draw_card_content(screen, card)
+
                 elif card["state"] == "matched":
-                    pygame.draw.rect(screen, GRAY, rect, border_radius=8)
-                    draw_text(str(card["value"]), font_large, BLACK, screen, rect.centerx, rect.centery)
+                    draw_card_content(screen, card)
+                    s = pygame.Surface((CARD_SIZE, CARD_SIZE))
+                    s.set_alpha(100)
+                    s.fill(GREEN)
+                    screen.blit(s, rect.topleft)
+                    pygame.draw.rect(screen, GREEN, rect, 3, border_radius=8)
 
     def game_loop():
         board = create_board()
         revealed_cards = []
         matches_found = 0
         game_over = False
-        start_time = pygame.time.get_ticks()
 
-        if cheats_enabled:
+        preview_duration = 8000  # 8 segundos em milissegundos
+        preview_start = pygame.time.get_ticks()
+
+        in_preview = True
+        while in_preview:
+            current_time = pygame.time.get_ticks()
+            elapsed = current_time - preview_start
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    return 0
+                if event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+                    return 0
+
+            if elapsed >= preview_duration:
+                in_preview = False
+
             screen.fill(BLACK)
+
             for r in range(GRID_ROWS):
                 for c in range(GRID_COLS):
-                    card = board[r][c]
-                    rect = card["rect"]
-                    pygame.draw.rect(screen, WHITE, rect, border_radius=8)
-                    draw_text(str(card["value"]), font_large, BLACK, screen, rect.centerx, rect.centery)
+                    draw_card_content(screen, board[r][c])
 
-            draw_text("CHEATS: Revelando tabuleiro...", font_medium, GREEN, screen, WIDTH // 2, 30)
+            time_left = math.ceil((preview_duration - elapsed) / 1000)
+            draw_text(f"MEMORIZE! Início em: {time_left}", font_medium, GREEN, screen, WIDTH // 2, 30)
+
             pygame.display.flip()
-            pygame.time.wait(2000)
+            clock.tick(60)
+        start_time = pygame.time.get_ticks()
 
         running = True
         while running:
@@ -113,6 +169,13 @@ def main(screen, clock, cheats_enabled):
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
                         running = False
+                    if cheats_enabled and event.key == pygame.K_c:
+                        screen.fill(BLACK)
+                        for r in range(GRID_ROWS):
+                            for c in range(GRID_COLS):
+                                draw_card_content(screen, board[r][c])
+                        pygame.display.flip()
+                        pygame.time.wait(1000)
 
                 if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and not game_over:
                     if len(revealed_cards) < 2:
@@ -124,7 +187,13 @@ def main(screen, clock, cheats_enabled):
                                 revealed_cards.append((r, c))
 
             if len(revealed_cards) == 2:
-                pygame.time.wait(500)
+                screen.fill(BLACK)
+                draw_board(board)
+                time_elapsed = (pygame.time.get_ticks() - start_time) // 1000
+                draw_text(f"Tempo: {time_elapsed}s", font_medium, WHITE, screen, WIDTH - 100, 30)
+                pygame.display.flip()
+
+                pygame.time.wait(800)
 
                 r1, c1 = revealed_cards[0]
                 r2, c2 = revealed_cards[1]
@@ -145,7 +214,7 @@ def main(screen, clock, cheats_enabled):
                 game_over = True
                 end_time = pygame.time.get_ticks()
                 time_taken_ms = end_time - start_time
-                score = max(0, 100000 - (time_taken_ms // 100))
+                score = max(0, 100000 - (time_taken_ms // 10))
 
             screen.fill(BLACK)
             draw_board(board)
@@ -154,8 +223,13 @@ def main(screen, clock, cheats_enabled):
                 draw_text(f"Tempo: {time_elapsed}s", font_medium, WHITE, screen, WIDTH - 100, 30)
 
             if game_over:
-                draw_text("VOCÊ VENCEU!", font_large, GREEN, screen, WIDTH // 2, HEIGHT // 2 - 40)
-                draw_text(f"Pontuação: {score}", font_medium, WHITE, screen, WIDTH // 2, HEIGHT // 2 + 20)
+                panel_rect = pygame.Rect(0, 0, 400, 300)
+                panel_rect.center = (WIDTH // 2, HEIGHT // 2)
+                pygame.draw.rect(screen, (50, 50, 50), panel_rect, border_radius=20)
+                pygame.draw.rect(screen, WHITE, panel_rect, 2, border_radius=20)
+
+                draw_text("PARABÉNS!", font_large, GREEN, screen, WIDTH // 2, HEIGHT // 2 - 50)
+                draw_text(f"Pontuação: {score}", font_medium, WHITE, screen, WIDTH // 2, HEIGHT // 2 + 10)
                 draw_text("Pressione [ESC] para sair", font_small, WHITE, screen, WIDTH // 2, HEIGHT // 2 + 60)
 
             pygame.display.flip()

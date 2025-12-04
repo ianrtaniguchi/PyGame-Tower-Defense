@@ -130,8 +130,6 @@ def load_sound(filename, volume=0.20):  # Tenta carregar um som, se falhar, reto
 
 # Carregamento em si das midias
 try:
-    print(f"Tentando carregar mapa de: {str(IMAGES_DIR / 'map.png')}")
-
     background_image = pygame.image.load(str(IMAGES_DIR / "map.png")).convert()
 except pygame.error as e:
     print(f"Erro CRÍTICO ao carregar 'map.png': {e}")
@@ -143,31 +141,36 @@ except pygame.error as e:
 # 1. Eye Monster (Tanque) -> Arquivos .jpg
 eye_walk_imgs = []
 for i in range(1, 9):
-    # Nota: Eye Monster usa .jpg nos arquivos que você enviou
-    img = load_image(f"Eye-Monster/walk/monster-{i}.jpg", (40, 40), BLUE, scale=(50, 50))
+    # Correção: Extensão mudada para .png
+    img = load_image(f"Eye-Monster/walk/monster-{i}.png", (40, 40), BLUE, scale=(50, 50))
     eye_walk_imgs.append(img)
 
 eye_death_imgs = []
 for i in range(1, 5):
-    img = load_image(f"Eye-Monster/death/death-{i}.jpg", (40, 40), RED, scale=(50, 50))
+    # Correção: Extensão mudada para .png
+    img = load_image(f"Eye-Monster/death/death-{i}.png", (40, 40), RED, scale=(50, 50))
     eye_death_imgs.append(img)
 
 # 2. Skeleton (Soldier) -> Arquivos .png
 # IMPORTANTE: Crie uma pasta chamada "Skeleton" dentro de assets/images e coloque os arquivos lá
 skelly_walk_imgs = []
 for i in range(1, 4):
-    img = load_image(f"Skeleton/base.skelly.side ({i}).png", (32, 32), GREY, scale=(40, 40))
+    # Correção: pasta 'skeleton/side/'
+    img = load_image(f"skeleton/side/base.skelly.side ({i}).png", (32, 32), GREY, scale=(40, 40))
     skelly_walk_imgs.append(img)
 
 skelly_death_imgs = []
 for i in range(1, 9):
-    img = load_image(f"Skeleton/base.skelly.death ({i}).png", (32, 32), RED, scale=(40, 40))
+    # Correção: pasta 'skeleton/death/'
+    img = load_image(f"skeleton/death/base.skelly.death ({i}).png", (32, 32), RED, scale=(40, 40))
     skelly_death_imgs.append(img)
 
 
-tank_sprite = load_image("tank.png", (40, 40), GREY)  #
-arrow_tower_sprite = load_image("arrow_tower.png", (48, 48), GREEN)
-cannon_tower_sprite = load_image("cannon_tower.png", (48, 48), RED)
+# Correção: Apontando para o arquivo correto da torre 1
+arrow_tower_sprite = load_image("tipo 1 de torre/tower - 1.png", (48, 48), GREEN)
+
+# Correção: Apontando para o arquivo correto da torre 2 (Canhão)
+cannon_tower_sprite = load_image("tipo 2 torre/New Piskel (1).png", (48, 48), RED)
 arrow_projectile_sprite = load_image("arrow_projectile.png", (10, 10), WHITE)
 cannon_projectile_sprite = load_image("cannon_projectile.png", (15, 15), ORANGE)
 
@@ -199,23 +202,34 @@ ost_cheats = load_sound("tower_defense_fx/OST/Ligeiro-OST_1_.wav")
 
 # Definição do Caminho (Waypoints)
 WAYPOINTS = [  # esses waypoints definem o caminho que os inimigos vão seguir, são coordenadas x,y que podem ser mudadas, mas dependem do mapa para fazer sentido visual
-    (-100, 150),
-    (300, 150),
-    (300, 400),
-    (1000, 400),
-    (1000, 200),
-    (1380, 200),  # Ponto final (fora da tela)
+    (-100, 300),
+    (300, 300),
+    (300, 490),
+    (980, 490),
+    (980, 190),
+    (1380, 190),  # Ponto final (fora da tela)
 ]
 
 # Locais de construção das torres, necessário alterar conforme o mapa (Del Pupo)
 TOWER_SLOTS = [
-    (200, 250),
-    (400, 250),
-    (200, 350),
-    (500, 500),
-    (700, 500),
-    (900, 500),
-    (900, 300),
+    (63, 180),
+    (237, 180),
+    (74, 380),
+    (214, 420),
+    (410, 300),
+    (390, 560),
+    (570, 560),
+    (730, 560),
+    (935, 560),
+    (580, 365),
+    (730, 365),
+    (885, 185),
+    (885, 340),
+    (1090, 395),
+    (1100, 75),
+    (1230, 75),
+    (1100, 270),
+    (1230, 270),
 ]
 
 TORRE_SLOT_RECTS = [pygame.Rect(pos[0] - 24, pos[1] - 24, 48, 48) for pos in TOWER_SLOTS]  # cria os rects para cada slot, que detecta a colisão do mouse os pos sao para centralizar o rect, 24 metade dos 48 pixels, deve ser alterado se mudar o tamanho das torres
