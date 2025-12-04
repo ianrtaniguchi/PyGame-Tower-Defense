@@ -2,9 +2,12 @@
 # Necessário instalar as dependências: pygame, pyrebase4
 # Use:
 # -pip install pygame pyrebase4
+# -pip install requests
+# Imports para programação
 import importlib  # COMENTAR DEPOIS
 import random
 import string
+import traceback
 
 import pygame
 import requests
@@ -43,8 +46,9 @@ clock = pygame.time.Clock()
 
 try:
     import tower_defense_game, snake_game, ping_pong_game, tic_tac_toe_game
-    import clash_royale_impostor, flappy_bird_game, pacman_game, cookie_clicker_game
+    import flappy_bird_game, pacman_game, cookie_clicker_game
     import memory_game, doisK_game, quiz_game, evade_game
+    import tic_tac_toe_online
 except ImportError as e:
     print(f"AVISO: Algum jogo não foi encontrado. {e}")
 
@@ -148,37 +152,6 @@ class Button:
                 self.callback()
                 return True
         return False
-    
-    def start_multiplayer_tictactoe(db):
-    choice = input("Digite 1 para CRIAR sala ou 2 para ENTRAR em uma: ")
-    if choice == '1':
-        game_id = ''.join(random.choices(string.ascii_uppercase + string.digits, k=4))
-        print(f"SALHA CRIADA! SEU CÓDIGO É: {game_id}")
-        
-        initial_state = {
-            "board": [[0,0,0], [0,0,0], [0,0,0]],
-            "turn": 1, 
-            "winner": 0
-        }
-        db.child("tictactoe").child(game_id).set(initial_state)
-        
-        return game_id, 1 
-        
-    elif choice == '2':
-        game_id = input("Digite o código da sala: ").strip().upper()
-        if db.child("tictactoe").child(game_id).get().val():
-            print(f"Entrando na sala {game_id}...")
-            return game_id, 2
-        else:
-            print("Sala não encontrada!")
-            return None, None
-            
-    return None, None
-
-    def launch_mp_tictactoe():
-    game_id, role = start_multiplayer_tictactoe(db)
-    if game_id:
-        tic_tac_toe_game.main(screen, clock, cheats_enabled, db, game_id, role)
 
 
 def submit_score(game_name, score):
@@ -311,6 +284,176 @@ SECRET = [pygame.K_y, pygame.K_a, pygame.K_k, pygame.K_u, pygame.K_t]
 key_seq = []
 
 
+def start_multiplayer_tictactoe(db_ref):
+    user_token = user_info.get("idToken")
+
+    running_local = True
+    stage = "CHOICE"
+    input_text = ""
+    generated_code = ""
+    status_message = ""
+    result = (None, None)
+
+    center_x = SCREEN_WIDTH // 2
+    center_y = SCREEN_HEIGHT // 2
+
+    if not user_token:
+        while running_local:
+            clock.tick(60)
+            screen.fill(BG_COLOR)
+            draw_grid(screen, 0)
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    pygame.quit()
+                    sys.exit()
+                if event.type == pygame.KEYDOWN or event.type == pygame.MOUSEBUTTONDOWN:
+                    return None, None
+
+            draw_panel(screen, pygame.Rect(center_x - 200, center_y - 100, 400, 200))
+            draw_text("ACESSO NEGADO", font_title, ERROR_COLOR, screen, center_x, center_y - 40, center=True)
+            draw_text("Você precisa fazer LOGIN primeiro.", font_small, WHITE, screen, center_x, center_y + 20, center=True)
+            draw_text("Pressione qualquer tecla para voltar.", font_small, SECONDARY_HOVER, screen, center_x, center_y + 60, center=True)
+            pygame.display.flip()
+        return None, None
+
+    while running_local:
+        clock.tick(60)
+        screen.fill(BG_COLOR)
+        draw_grid(screen, 0)
+
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                sys.exit()
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    return None, None
+
+                if stage == "JOIN":
+                    if event.key == pygame.K_BACKSPACE:
+                        input_text = input_text[:-1]
+                    elif event.key == pygame.K_RETURN:
+                        if len(input_text) > 0:
+                            status_message = "Buscando sala..."
+                            try:
+                                code = input_text.upper().strip()
+                                if db_ref and db_ref.child("tictactoe").child(code).get(token=user_token).val():
+                                    result = (code, 2)
+                                    running_local = False
+                                else:
+                                    status_message = "Sala não encontrada!"
+                            except Exception as e:
+                                print(e)
+                                status_message = "Erro de permissão ou conexão!"
+                    else:
+                        if len(input_text) < 4 and event.unicode.isalnum():
+                            input_text += event.unicode.upper()
+
+            if event.type == pygame.MOUSEBUTTONDOWN:
+                mouse_pos = event.pos
+
+                if stage == "CHOICE":
+                    btn_create = pygame.Rect(center_x - 220, center_y - 50, 200, 100)
+                    btn_join = pygame.Rect(center_x + 20, center_y - 50, 200, 100)
+
+                    if btn_create.collidepoint(mouse_pos):
+                        stage = "CREATE"
+                        generated_code = "".join(random.choices(string.ascii_uppercase + string.digits, k=4))
+
+                        initial_state = {"board": [[0, 0, 0], [0, 0, 0], [0, 0, 0]], "turn": 1, "winner": 0}
+                        if db_ref:
+                            try:
+                                db_ref.child("tictactoe").child(generated_code).set(initial_state, token=user_token)
+                            except:
+                                status_message = "Erro ao criar sala (Permissão)"
+
+                    elif btn_join.collidepoint(mouse_pos):
+                        stage = "JOIN"
+                        input_text = ""
+                        status_message = "Digite o código da sala"
+
+                elif stage == "CREATE":
+                    btn_play = pygame.Rect(center_x - 100, center_y + 100, 200, 60)
+                    if btn_play.collidepoint(mouse_pos):
+                        result = (generated_code, 1)
+                        running_local = False
+
+                elif stage == "JOIN":
+                    btn_connect = pygame.Rect(center_x - 100, center_y + 100, 200, 60)
+                    if btn_connect.collidepoint(mouse_pos):
+                        if len(input_text) > 0:
+                            status_message = "Verificando..."
+                            try:
+                                code = input_text.upper().strip()
+                                if db_ref and db_ref.child("tictactoe").child(code).get(token=user_token).val():
+                                    result = (code, 2)
+                                    running_local = False
+                                else:
+                                    status_message = "Sala inválida!"
+                            except:
+                                status_message = "Erro ao conectar!"
+
+        draw_text("MULTIPLAYER ONLINE", font_title, WHITE, screen, center_x, 100, center=True)
+        draw_text("Pressione ESC para voltar", font_small, SECONDARY_HOVER, screen, center_x, 140, center=True)
+
+        if stage == "CHOICE":
+            r_create = pygame.Rect(center_x - 220, center_y - 50, 200, 100)
+            pygame.draw.rect(screen, PRIMARY_COLOR, r_create, border_radius=15)
+            draw_text("CRIAR SALA", font_medium, WHITE, screen, r_create.centerx, r_create.centery, center=True)
+
+            r_join = pygame.Rect(center_x + 20, center_y - 50, 200, 100)
+            pygame.draw.rect(screen, SECONDARY_COLOR, r_join, border_radius=15)
+            draw_text("ENTRAR", font_medium, WHITE, screen, r_join.centerx, r_join.centery, center=True)
+
+        elif stage == "CREATE":
+            draw_text("Sua Sala foi Criada!", font_medium, SUCCESS_COLOR, screen, center_x, center_y - 100, center=True)
+
+            draw_text(f"CÓDIGO: {generated_code}", font_large, WHITE, screen, center_x, center_y, center=True)
+            draw_text("Compartilhe este código com seu amigo", font_small, TEXT_COLOR, screen, center_x, center_y + 50, center=True)
+
+            r_play = pygame.Rect(center_x - 100, center_y + 100, 200, 60)
+            pygame.draw.rect(screen, PRIMARY_COLOR, r_play, border_radius=10)
+            draw_text("JOGAR", font_medium, WHITE, screen, r_play.centerx, r_play.centery, center=True)
+
+        elif stage == "JOIN":
+            draw_text("Digite o código da sala:", font_medium, WHITE, screen, center_x, center_y - 80, center=True)
+
+            input_box = pygame.Rect(center_x - 150, center_y - 30, 300, 70)
+            pygame.draw.rect(screen, INPUT_BG, input_box, border_radius=10)
+            pygame.draw.rect(screen, FOCUS_COLOR, input_box, 2, border_radius=10)
+
+            draw_text(input_text, font_large, WHITE, screen, input_box.centerx, input_box.centery, center=True)
+
+            r_conn = pygame.Rect(center_x - 100, center_y + 100, 200, 60)
+            color_btn = PRIMARY_COLOR if len(input_text) == 4 else SECONDARY_COLOR
+            pygame.draw.rect(screen, color_btn, r_conn, border_radius=10)
+            draw_text("CONECTAR", font_medium, WHITE, screen, r_conn.centerx, r_conn.centery, center=True)
+
+            if status_message:
+                col = ERROR_COLOR if "inválida" in status_message or "não" in status_message or "Erro" in status_message else TEXT_COLOR
+                draw_text(status_message, font_small, col, screen, center_x, center_y + 180, center=True)
+
+        pygame.display.flip()
+
+    return result
+
+
+def launch_mp_tictactoe():
+    game_id, role = start_multiplayer_tictactoe(db)
+
+    if game_id:
+        token = user_info.get("idToken")
+        try:
+            tic_tac_toe_online.main(screen, clock, cheats_enabled, db, game_id, role, token)
+        except TypeError as e:
+            print(f"ERRO DE ARGUMENTOS: {e}")
+            print("Verifique se você salvou o arquivo 'tic_tac_toe_online.py' com a nova definição: 'def main(..., user_token):'")
+        except Exception as e:
+            print("ERRO CRÍTICO AO INICIAR O JOGO:")
+            traceback.print_exc()
+
+
 def main():
     global cheats_enabled, key_seq, user_info
     game_state = "LOGIN" if auth else "MENU"
@@ -417,7 +560,6 @@ def main():
         ("Ping Pong", lambda: run_game(ping_pong_game, "ping_pong")),
         ("Jogo da Velha", lambda: run_game(tic_tac_toe_game, "tic_tac_toe")),
         ("Jogo da Velha Online", launch_mp_tictactoe),
-        ("Impostor - CR", lambda: run_game(clash_royale_impostor, "clash_royale_impostor")),
         ("Flappy Bird", lambda: run_game(flappy_bird_game, "flappy_bird_game")),
         ("Pac-Man", lambda: run_game(pacman_game, "pacman_game")),
         ("Cookie Clicker", lambda: run_game(cookie_clicker_game, "cookie_clicker_game")),
@@ -442,7 +584,6 @@ def main():
         ("Snake", "snake_game"),
         ("Ping Pong", "ping_pong"),
         ("Jogo da Velha", "tic_tac_toe"),
-        ("Impostor", "clash_royale_impostor"),
         ("Flappy Bird", "flappy_bird_game"),
         ("Pac-Man", "pacman_game"),
         ("Cookie Clicker", "cookie_clicker_game"),

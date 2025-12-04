@@ -31,7 +31,7 @@ import sys
 import math
 import random
 from pathlib import Path
-import os  
+import os
 
 
 if getattr(sys, "frozen", False):
@@ -48,16 +48,15 @@ IMAGES_DIR = ASSETS_DIR / "images"
 SOUNDS_DIR = ASSETS_DIR / "sounds"
 
 
-
 SCREEN_WIDTH = 1280
-SCREEN_HEIGHT = 720 
+SCREEN_HEIGHT = 720
 UI_PANEL_HEIGHT = 100
 GAME_HEIGHT = SCREEN_HEIGHT - UI_PANEL_HEIGHT
 FPS = 60
 
 
 INITIAL_LIVES = 20
-INITIAL_MONEY = 300 
+INITIAL_MONEY = 300
 
 
 LIGHT_BLUE = (173, 216, 230)
@@ -70,9 +69,7 @@ GREY = (100, 100, 100)
 ORANGE = (255, 165, 0)
 
 
-
-
-def create_placeholder_surface(width, height, color): 
+def create_placeholder_surface(width, height, color):
     surface = pygame.Surface((width, height), pygame.SRCALPHA)
     surface.fill(color)
     return surface
@@ -101,7 +98,7 @@ def load_image(filename, placeholder_size, placeholder_color, colorkey=None, sca
         return create_placeholder_surface(placeholder_size[0], placeholder_size[1], placeholder_color)
 
 
-def load_sound(filename, volume=0.20):  
+def load_sound(filename, volume=0.20):
     try:
         sound = pygame.mixer.Sound(str(SOUNDS_DIR / filename))
         sound.set_volume(volume)
@@ -110,7 +107,6 @@ def load_sound(filename, volume=0.20):
     except pygame.error:
         print(f"AVISO: Som '{filename}' não encontrado.")
         return None
-
 
 
 try:
@@ -124,59 +120,61 @@ except pygame.error as e:
 eye_walk_imgs = []
 for i in range(1, 9):
 
-    img = load_image(f"Eye-Monster/walk/monster-{i}.png", (40, 40), BLUE, scale=(50, 50))
+    img = load_image(f"Eye-Monster/walk/monster-{i}.png", (45, 45), BLUE, scale=(50, 50))
     eye_walk_imgs.append(img)
 
 eye_death_imgs = []
 for i in range(1, 5):
 
-    img = load_image(f"Eye-Monster/death/death-{i}.png", (40, 40), RED, scale=(50, 50))
+    img = load_image(f"Eye-Monster/death/death-{i}.png", (45, 45), RED, scale=(50, 50))
     eye_death_imgs.append(img)
 
 skelly_walk_imgs = []
 for i in range(1, 4):
 
-    img = load_image(f"skeleton/side/base.skelly.side ({i}).png", (32, 32), GREY, scale=(40, 40))
+    img = load_image(f"skeleton/side/base.skelly.side ({i}).png", (40, 40), GREY, scale=(40, 40))
     skelly_walk_imgs.append(img)
 
 skelly_death_imgs = []
 for i in range(1, 9):
-    img = load_image(f"skeleton/death/base.skelly.death ({i}).png", (32, 32), RED, scale=(40, 40))
+    img = load_image(f"skeleton/death/base.skelly.death ({i}).png", (40, 40), RED, scale=(40, 40))
     skelly_death_imgs.append(img)
-
 
 
 arrow_tower_sprite = load_image("tipo 1 de torre/tower - 1.png", (48, 48), GREEN)
 
 
 cannon_tower_sprite = load_image("tipo 2 torre/New Piskel (1).png", (48, 48), RED)
-arrow_projectile_sprite = load_image("arrow_projectile.png", (10, 10), WHITE)
-cannon_projectile_sprite = load_image("cannon_projectile.png", (15, 15), ORANGE)
+arrow_projectile_sprite = load_image("arrow.projectile-1.png.png", (10, 10), WHITE)
+cannon_projectile_sprite = load_image("cannon.projectile-1.png.png", (15, 15), ORANGE)
 
 sfx_arrow_fire = load_sound("tower_defense_fx/Other/Shot.wav")
 sfx_cannon_fire = load_sound("tower_defense_fx/Other/Gunshot_1_A.wav")
 sfx_enemy_death = load_sound("enemy_death.wav")
 sfx_life_lost = load_sound("life_lost.wav")
 sfx_build = load_sound("build.wav")
-sfx_explosion = load_sound("tower_defense_fx/Other/Explosion.wav")  
-
-
-try:  
-    font_large = pygame.font.SysFont("Arial", 48)
-    font_medium = pygame.font.SysFont("Arial", 24)
-    font_small = pygame.font.SysFont("Arial", 18)
-except:  
+sfx_explosion = load_sound("tower_defense_fx/Other/Explosion.wav")
 ost_normal = load_sound("tower_defense_fx/OST/Main OST cut.wav")
 ost_cheats = load_sound("tower_defense_fx/OST/Ligeiro-OST_1_.wav")
 
 
-WAYPOINTS = [  
+try:
+    font_large = pygame.font.SysFont("Arial", 48)
+    font_medium = pygame.font.SysFont("Arial", 24)
+    font_small = pygame.font.SysFont("Arial", 18)
+except:
+    font_large = pygame.font.Font(None, 48)
+    font_medium = pygame.font.Font(None, 24)
+    font_small = pygame.font.Font(None, 18)
+
+
+WAYPOINTS = [
     (-100, 300),
     (300, 300),
     (300, 490),
     (980, 490),
     (980, 190),
-    (1380, 190),  
+    (1380, 190),
 ]
 
 
@@ -201,20 +199,19 @@ TOWER_SLOTS = [
     (1230, 270),
 ]
 
-TORRE_SLOT_RECTS = [pygame.Rect(pos[0] - 24, pos[1] - 24, 48, 48) for pos in TOWER_SLOTS] 
-occupied_slots = []  
+TORRE_SLOT_RECTS = [pygame.Rect(pos[0] - 24, pos[1] - 24, 48, 48) for pos in TOWER_SLOTS]
+occupied_slots = []
 
-WAVE_DEFINITIONS = [ 
-    {"soldier": 5, "tank": 0},  
-    {"soldier": 10, "tank": 0}, 
-    {"soldier": 15, "tank": 2},  
-    {"soldier": 10, "tank": 5},  
-    {"soldier": 0, "tank": 10},  
-    {"soldier": 20, "tank": 10},  
+WAVE_DEFINITIONS = [
+    {"soldier": 5, "tank": 0},
+    {"soldier": 10, "tank": 0},
+    {"soldier": 15, "tank": 2},
+    {"soldier": 10, "tank": 5},
+    {"soldier": 0, "tank": 10},
+    {"soldier": 20, "tank": 10},
 ]
 
 TOWER_DATA = {
-
     "arrow": {
         "image": arrow_tower_sprite,
         "cost": 50,
@@ -226,11 +223,11 @@ TOWER_DATA = {
         "image": cannon_tower_sprite,
         "cost": 120,
         "range": 120,
-        "fire_rate": 2000,  
+        "fire_rate": 2000,
         "damage": 50,
-        "splash_radius": 50,  
+        "splash_radius": 50,
+    },
 }
-
 
 
 class Enemy(pygame.sprite.Sprite):
@@ -246,7 +243,6 @@ class Enemy(pygame.sprite.Sprite):
         self.frame_index = 0
         self.animation_speed = 0.15
 
-
         if enemy_type == "soldier":
 
             self.sprites_walk = skelly_walk_imgs if skelly_walk_imgs else [create_placeholder_surface(32, 32, GREY)]
@@ -255,7 +251,7 @@ class Enemy(pygame.sprite.Sprite):
             self.max_health = 80
             self.reward = 15
             self.animation_speed = 0.15
-            self.image = self.sprites_walk[0]  
+            self.image = self.sprites_walk[0]
 
         elif enemy_type == "tank":
 
@@ -265,7 +261,7 @@ class Enemy(pygame.sprite.Sprite):
             self.max_health = 300
             self.reward = 30
             self.animation_speed = 0.2
-            self.image = self.sprites_walk[0]  
+            self.image = self.sprites_walk[0]
 
         else:
 
@@ -274,7 +270,7 @@ class Enemy(pygame.sprite.Sprite):
             self.speed = 1
             self.max_health = 10
             self.reward = 1
-            self.image = self.sprites_walk[0]  
+            self.image = self.sprites_walk[0]
 
         self.rect = self.image.get_rect(center=self.pos)
         self.health = self.max_health
@@ -292,11 +288,10 @@ class Enemy(pygame.sprite.Sprite):
             diff = target_vector - self.pos
             direction = diff.normalize()
 
-
             if direction.x < 0:
-                self.flip = True 
+                self.flip = True
             elif direction.x > 0:
-                self.flip = False  
+                self.flip = False
 
         except ValueError:
             direction = pygame.math.Vector2(0, 0)
@@ -357,10 +352,10 @@ class Enemy(pygame.sprite.Sprite):
             pygame.draw.rect(surface, GREEN, (bx, by, bar_w * ratio, bar_h))
 
 
-class Tower(pygame.sprite.Sprite):  
+class Tower(pygame.sprite.Sprite):
     def __init__(self, tower_type, pos):
         super().__init__()
-        self.data = TOWER_DATA[tower_type].copy() 
+        self.data = TOWER_DATA[tower_type].copy()
         self.damage_level = 1
         self.speed_level = 1
 
@@ -391,12 +386,12 @@ class Tower(pygame.sprite.Sprite):
             sfx_build.play()
 
     def upgrade_speed(self):
-        self.fire_rate = int(self.fire_rate * 0.85)  
+        self.fire_rate = int(self.fire_rate * 0.85)
         self.speed_level += 1
         if sfx_build:
             sfx_build.play()
 
-    def update(self, enemy_group, projectile_group): 
+    def update(self, enemy_group, projectile_group):
         self.find_target(enemy_group)
 
         if self.target:
@@ -418,7 +413,7 @@ class Tower(pygame.sprite.Sprite):
                     closest_dist_sq = dist_sq
                     self.target = enemy
 
-    def shoot(self, projectile_group):  
+    def shoot(self, projectile_group):
         if self.tower_type == "arrow":
             projectile = Projectile("arrow", self.pos, self.target, self.damage)
             projectile_group.add(projectile)
@@ -431,22 +426,22 @@ class Tower(pygame.sprite.Sprite):
             if sfx_cannon_fire:
                 sfx_cannon_fire.play()
 
-    def draw_range(self, surface):  
+    def draw_range(self, surface):
         range_surface = pygame.Surface((self.range * 2, self.range * 2), pygame.SRCALPHA)
         pygame.draw.circle(range_surface, (255, 255, 255, 50), (self.range, self.range), self.range)
         surface.blit(range_surface, (self.pos.x - self.range, self.pos.y - self.range))
 
 
-class Projectile(pygame.sprite.Sprite):  
+class Projectile(pygame.sprite.Sprite):
     def __init__(self, projectile_type, pos, target, damage, splash_radius=0):
         super().__init__()
 
-        self.projectile_type = projectile_type  
-        self.pos = pygame.math.Vector2(pos)  
+        self.projectile_type = projectile_type
+        self.pos = pygame.math.Vector2(pos)
         self.target = target
         self.damage = damage
 
-        if self.projectile_type == "arrow": 
+        if self.projectile_type == "arrow":
             self.image = arrow_projectile_sprite
             self.speed = 10
 
@@ -458,13 +453,13 @@ class Projectile(pygame.sprite.Sprite):
 
         self.rect = self.image.get_rect(center=self.pos)
 
-    def update(self, enemy_group, money_callback):  
+    def update(self, enemy_group, money_callback):
         if self.projectile_type == "arrow":
-            self.move_arrow(money_callback)  
+            self.move_arrow(money_callback)
         elif self.projectile_type == "cannon":
-            self.move_cannon(enemy_group, money_callback) 
+            self.move_cannon(enemy_group, money_callback)
 
-    def move_arrow(self, money_callback):  
+    def move_arrow(self, money_callback):
         if not self.target or not self.target.alive() or self.target.state == "dying":
             self.kill()
             return
@@ -476,13 +471,12 @@ class Projectile(pygame.sprite.Sprite):
         self.pos += direction * self.speed
         self.rect.center = self.pos
 
-
         if pygame.sprite.collide_circle(self, self.target):
             reward = self.target.take_damage(self.damage)
             money_callback(reward)
             self.kill()
 
-    def move_cannon(self, enemy_group, money_callback): 
+    def move_cannon(self, enemy_group, money_callback):
         try:
             direction = (self.target_pos - self.pos).normalize()
         except ValueError:
@@ -491,12 +485,11 @@ class Projectile(pygame.sprite.Sprite):
         self.pos += direction * self.speed
         self.rect.center = self.pos
 
-
         if (self.target_pos - self.pos).length_squared() < self.speed**2:
             self.explode(enemy_group, money_callback)
             self.kill()
 
-    def explode(self, enemy_group, money_callback):  
+    def explode(self, enemy_group, money_callback):
         if sfx_explosion:
             sfx_explosion.play()
         for enemy in enemy_group:
@@ -506,7 +499,7 @@ class Projectile(pygame.sprite.Sprite):
                 money_callback(reward)
 
 
-class Button:  
+class Button:
     def __init__(self, x, y, width, height, image, cost):
         self.rect = pygame.Rect(x, y, width, height)
         self.image = pygame.transform.scale(image, (width - 10, height - 10))
@@ -517,15 +510,14 @@ class Button:
         if self.is_hovered and money >= self.cost:
             bg_color = GREEN
         elif self.is_hovered:
-            bg_color = RED 
+            bg_color = RED
         elif money < self.cost:
-            bg_color = GREY 
+            bg_color = GREY
         else:
-            bg_color = BLACK  
+            bg_color = BLACK
 
         pygame.draw.rect(surface, bg_color, self.rect)
-        pygame.draw.rect(surface, WHITE, self.rect, 2)  
-
+        pygame.draw.rect(surface, WHITE, self.rect, 2)
 
         img_rect = self.image.get_rect(center=self.rect.center)
         surface.blit(self.image, img_rect)
@@ -547,7 +539,6 @@ class Button:
         return self.rect.collidepoint(mouse_pos)
 
 
-
 def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
     text_obj = font.render(text, True, color)
     text_rect = text_obj.get_rect()
@@ -565,8 +556,7 @@ def draw_text(text, font, color, surface, x, y, center=False, v_center=False):
 def draw_ui(surface, lives, money, wave, total_waves, buttons):
     panel_rect = pygame.Rect(0, GAME_HEIGHT, SCREEN_WIDTH, UI_PANEL_HEIGHT)
     pygame.draw.rect(surface, BLACK, panel_rect)
-    pygame.draw.rect(surface, WHITE, panel_rect, 2) 
-
+    pygame.draw.rect(surface, WHITE, panel_rect, 2)
 
     draw_text(f"Vidas: {lives}", font_medium, WHITE, surface, 20, GAME_HEIGHT + 10)
     draw_text(f"Dinheiro: ${money}", font_medium, WHITE, surface, 20, GAME_HEIGHT + 50)
@@ -588,27 +578,22 @@ def draw_upgrade_menu(surface, tower, money):
     pygame.draw.rect(surface, (40, 40, 50), panel_rect)
     pygame.draw.rect(surface, WHITE, panel_rect, 2)
 
-
     info_text = f"Torre: {tower.tower_type.upper()} | Dano: {tower.damage} | Delay: {tower.fire_rate}ms"
     draw_text(info_text, font_medium, WHITE, surface, 20, GAME_HEIGHT + 10)
-
 
     cost_dmg = tower.get_upgrade_cost("damage")
     cost_spd = tower.get_upgrade_cost("speed")
     refund = int(tower.data["cost"] * 0.75)
-
 
     btn_dmg = pygame.Rect(400, GAME_HEIGHT + 40, 200, 40)
     color_dmg = GREEN if money >= cost_dmg else GREY
     pygame.draw.rect(surface, color_dmg, btn_dmg)
     draw_text(f"UP Dano (-${cost_dmg})", font_small, BLACK, surface, btn_dmg.centerx, btn_dmg.centery, center=True)
 
-
     btn_spd = pygame.Rect(620, GAME_HEIGHT + 40, 200, 40)
     color_spd = ORANGE if money >= cost_spd else GREY
     pygame.draw.rect(surface, color_spd, btn_spd)
     draw_text(f"UP Rapidez (-${cost_spd})", font_small, BLACK, surface, btn_spd.centerx, btn_spd.centery, center=True)
-
 
     btn_sell = pygame.Rect(840, GAME_HEIGHT + 40, 200, 40)
     pygame.draw.rect(surface, RED, btn_sell)
@@ -619,7 +604,7 @@ def draw_upgrade_menu(surface, tower, money):
     return btn_dmg, btn_spd, btn_sell
 
 
-def draw_tower_slots(surface, selected_tower_type):  
+def draw_tower_slots(surface, selected_tower_type):
     for i, rect in enumerate(TORRE_SLOT_RECTS):
         if i not in occupied_slots:
             if selected_tower_type:
@@ -628,7 +613,7 @@ def draw_tower_slots(surface, selected_tower_type):
                 pygame.draw.circle(surface, (50, 50, 50), rect.center, 24, 2)
 
 
-def draw_tower_preview(surface, mouse_pos, tower_type): 
+def draw_tower_preview(surface, mouse_pos, tower_type):
     if not tower_type:
         return
 
@@ -644,7 +629,6 @@ def draw_tower_preview(surface, mouse_pos, tower_type):
         image,
         (mouse_pos[0] - image.get_width() // 2, mouse_pos[1] - image.get_height() // 2),
     )
-
 
 
 def run_transition(screen, clock):
@@ -679,7 +663,7 @@ def run_transition(screen, clock):
     pygame.time.wait(200)
 
 
-def main(screen, clock, cheats_enabled): 
+def main(screen, clock, cheats_enabled):
     running = True
     game_state = "START_MENU"
 
@@ -822,12 +806,12 @@ def main(screen, clock, cheats_enabled):
                             for tower in tower_group:
                                 if tower.rect.collidepoint(mouse_pos):
                                     selected_tower_instance = tower
-                                    selected_tower_type = None 
+                                    selected_tower_type = None
                                     clicked_on_tower = True
                                     break
 
                             if not clicked_on_tower:
-                                selected_tower_instance = None 
+                                selected_tower_instance = None
                                 if selected_tower_type:
                                     for i, rect in enumerate(TORRE_SLOT_RECTS):
                                         if i not in occupied_slots and rect.collidepoint(mouse_pos):
@@ -861,7 +845,7 @@ def main(screen, clock, cheats_enabled):
                         occupied_slots.clear()
                         wave_in_progress = False
                         wave_spawn_list = []
-                        selected_tower_instance = None  
+                        selected_tower_instance = None
 
                     elif event.key == pygame.K_ESCAPE:
                         running = False
